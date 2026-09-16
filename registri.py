@@ -11,19 +11,17 @@ import os
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # ==========================================
 def get_google_sheet(sheet_name):
-    # Define los alcances
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # Carga tus credenciales JSON (debes tener este archivo en tu directorio)
     try:
-        # Convertimos los secrets de Streamlit en un diccionario
+        # Usamos las credenciales guardadas en la nube
         creds_dict = dict(st.secrets["gcp_service_account"])
-        # Autenticamos usando ese diccionario
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open("Registro_UPC").worksheet(sheet_name)
         return sheet
     except Exception as e:
-        st.warning("No se pudo conectar a Google Sheets. Verifica 'credenciales.json'. Modo local activado.")
+        # VAMOS A CAMBIAR ESTE MENSAJE PARA VER EL ERROR REAL
+        st.error(f"Error de conexión detallado: {e}")
         return None
 
 # ==========================================
