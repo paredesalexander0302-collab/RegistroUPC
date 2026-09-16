@@ -49,12 +49,18 @@ def generar_pdf_detenido(datos, foto_path):
     pdf.add_page()
     pdf.set_font('helvetica', '', 11)
     
-    # Agregar datos
+    # --- REEMPLAZA ESTA PARTE ---
     for key, value in datos.items():
+        # Validamos que no esté vacío. Si lo está, ponemos "No registrado"
+        texto_valor = str(value).strip() if str(value).strip() else "No registrado"
+        
         pdf.set_font('helvetica', 'B', 11)
         pdf.cell(50, 8, f"{key}:", ln=0)
         pdf.set_font('helvetica', '', 11)
-        pdf.multi_cell(0, 8, str(value))
+        
+        # En lugar de 0, le damos el ancho exacto restante (140) para evitar que colapse
+        pdf.multi_cell(140, 8, texto_valor)
+    # -----------------------------
     
     if foto_path:
         pdf.ln(10)
