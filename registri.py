@@ -6,7 +6,7 @@ from datetime import datetime
 from fpdf import FPDF
 import tempfile
 import os
-
+import traceback
 # ==========================================
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # ==========================================
@@ -170,8 +170,8 @@ with tab1:
                     st.download_button("Descargar Ficha PDF", f, file_name=f"Ficha_{cedula_detenido}.pdf", mime="application/pdf")
                     
             except Exception as e:
-                st.error(f"Ocurrió un error: {e}")
-
+                st.error("Error detallado:")
+                st.code(traceback.format_exc())
 # ==========================================
 # PESTAÑA 2: VEHÍCULOS
 # ==========================================
