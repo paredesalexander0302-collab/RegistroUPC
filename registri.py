@@ -15,7 +15,10 @@ def get_google_sheet(sheet_name):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     # Carga tus credenciales JSON (debes tener este archivo en tu directorio)
     try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name("credenciales.json", scope)
+        # Convertimos los secrets de Streamlit en un diccionario
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        # Autenticamos usando ese diccionario
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         sheet = client.open("Registro_UPC").worksheet(sheet_name)
         return sheet
