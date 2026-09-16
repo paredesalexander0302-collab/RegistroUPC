@@ -11,17 +11,11 @@ import os
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # ==========================================
 def get_google_sheet(sheet_name):
-    # Define los alcances
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
-    # Leemos directamente los secretos de la nube
     creds_dict = dict(st.secrets["gcp_service_account"])
-    
-    # Autenticamos
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     sheet = client.open("Registro_UPC").worksheet(sheet_name)
-    
     return sheet
 
 # ==========================================
@@ -29,14 +23,12 @@ def get_google_sheet(sheet_name):
 # ==========================================
 class FichaPDF(FPDF):
     def header(self):
-        # Marca de agua en el centro de la página
         try:
             with self.local_context(fill_opacity=0.15):
                 self.image('logo_policia.png', x=45, y=80, w=120)
         except:
-            pass # Si no hay logo, se omite
+            pass 
         
-        # Encabezado institucional
         self.set_font('helvetica', 'B', 14)
         self.cell(0, 10, 'POLICÍA NACIONAL DEL ECUADOR', border=0, ln=1, align='C')
         self.set_font('helvetica', 'B', 12)
@@ -48,7 +40,6 @@ def generar_pdf_detenido(datos, foto_path):
     pdf.add_page()
     pdf.set_font('helvetica', '', 11)
     
-    # Agregar datos controlando el ancho y los campos vacíos
     for key, value in datos.items():
         texto_valor = str(value).strip() if str(value).strip() else "No registrado"
         
@@ -73,7 +64,6 @@ st.set_page_config(page_title="Sistema de Registro UPC", layout="wide")
 
 st.title("Sistema de Gestión y Registro - UPC")
 
-# Datos del Servidor Policial y UPC
 with st.sidebar:
     st.header("Datos de Guardia")
     upc_actual = st.selectbox("Identificación del UPC", ["UPC San Miguel 1", "UPC San Miguel 2", "UPC Centro", "Otro"])
@@ -82,7 +72,6 @@ with st.sidebar:
     st.divider()
     st.write(f"**Fecha actual:** {datetime.now().strftime('%Y-%m-%d')}")
 
-# Crear pestañas para organizar la información
 tab1, tab2 = st.tabs(["Registro de Detenidos", "Registro de Vehículos"])
 
 # ==========================================
@@ -91,7 +80,6 @@ tab1, tab2 = st.tabs(["Registro de Detenidos", "Registro de Vehículos"])
 with tab1:
     st.header("Ingreso de Detenidos / Aprehendidos")
     
-    # Botón de Verificación (Búsqueda)
     col_busqueda, col_btn = st.columns([3, 1])
     with col_busqueda:
         buscar_cedula = st.text_input("Ingrese cédula para verificar antecedentes en este UPC:")
@@ -104,7 +92,6 @@ with tab1:
                 registros = sheet_detenidos.get_all_records()
                 df = pd.DataFrame(registros)
                 if not df.empty and 'Cédula' in df.columns:
-                    # Buscamos coincidencias asegurando que sean texto
                     resultados = df[df['Cédula'].astype(str) == str(buscar_cedula)]
                     if not resultados.empty:
                         st.success(f"Se encontraron {len(resultados)} registro(s) previo(s).")
@@ -116,7 +103,9 @@ with tab1:
 
     st.subheader("Nuevo Registro")
     
-    # === FORMULARIO DE DETENIDOS ===
+    # ---------------------------------------------------------
+    # FORMULARIO
+    # ---------------------------------------------------------
     with st.form("form_detenidos"):
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -138,16 +127,16 @@ with tab1:
         razon_detencion = st.text_area("Motivo / Razón de la Detención")
         foto_upload = st.file_uploader("Subir Fotografía del Detenido", type=['jpg', 'png', 'jpeg'])
         
-        # Solo el botón de envío va dentro del formulario
         submit_detenido = st.form_submit_button("Guardar Registro y Generar Ficha")
         
-    # === LÓGICA FUERA DEL FORMULARIO ===
+    # ---------------------------------------------------------
+    # LÓGICA FUERA DEL FORMULARIO (Misma sangría que 'with st.form')
+    # ---------------------------------------------------------
     if submit_detenido:
         if not nombre_servidor or not cedula_servidor:
             st.error("Debe llenar los datos del servidor policial en la barra lateral.")
         else:
             try:
-                # 1. Guardar en matriz
                 datos_guardar = [
                     upc_actual, nombre_servidor, cedula_servidor,
                     ap_paterno, ap_materno, primer_nombre, segundo_nombre, cedula_detenido,
@@ -159,7 +148,6 @@ with tab1:
                 sheet_detenidos.append_row(datos_guardar)
                 st.success("¡Registro guardado en la nube exitosamente!")
                 
-                # 2. Generar PDF
                 foto_path = None
                 if foto_upload:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_foto:
@@ -178,7 +166,6 @@ with tab1:
                 
                 pdf_file = generar_pdf_detenido(datos_dict, foto_path)
                 
-                # 3. Mostrar botón de descarga (Ahora es válido porque está fuera del form)
                 with open(pdf_file, "rb") as f:
                     st.download_button("Descargar Ficha PDF", f, file_name=f"Ficha_{cedula_detenido}.pdf", mime="application/pdf")
                     
@@ -194,7 +181,6 @@ with tab2:
     tipo_registro = st.radio("Acción a realizar:", ["Ingreso de Vehículo", "Salida de Vehículo"])
     
     if tipo_registro == "Ingreso de Vehículo":
-        # === FORMULARIO INGRESO VEHÍCULO ===
         with st.form("form_ingreso_vehiculo"):
             col1, col2 = st.columns(2)
             with col1:
@@ -204,11 +190,10 @@ with tab2:
             with col2:
                 fecha_v = st.date_input("Fecha de Ingreso")
                 hora_v = st.time_input("Hora de Ingreso")
-                quien_ingresa = st.text_input("Grado, Nombres y C.I. de quien ingresa (Si es distinto al guardia)")
+                quien_ingresa = st.text_input("Grado, Nombres y C.I. de quien ingresa")
             
             submit_v_in = st.form_submit_button("Registrar Ingreso")
             
-        # === LÓGICA FUERA DEL FORMULARIO ===
         if submit_v_in:
             if not nombre_servidor:
                 st.error("Ingrese el nombre del servidor en la barra lateral.")
@@ -222,7 +207,6 @@ with tab2:
                     st.error(f"Ocurrió un error al guardar: {e}")
     
     else:
-        # === FORMULARIO SALIDA VEHÍCULO ===
         with st.form("form_salida_vehiculo"):
             st.info("Generación de Documento de Salida")
             placa_salida = st.text_input("Placas del Vehículo a Retirar")
@@ -233,7 +217,6 @@ with tab2:
             
             submit_v_out = st.form_submit_button("Registrar Salida y Generar Acta")
             
-        # === LÓGICA FUERA DEL FORMULARIO ===
         if submit_v_out:
             if not nombre_servidor:
                 st.error("Ingrese el nombre del servidor en la barra lateral.")
@@ -244,7 +227,6 @@ with tab2:
                     sheet_vehiculos.append_row(datos_v_out)
                     st.success("Salida registrada en la nube.")
                         
-                    # Generar PDF de salida
                     datos_salida = {
                         "UPC": upc_actual,
                         "Vehículo Placa": placa_salida,
