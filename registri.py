@@ -12,10 +12,20 @@ import traceback
 # ==========================================
 def get_google_sheet(sheet_name):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    
+    # Leemos directamente los secretos de la nube
     creds_dict = dict(st.secrets["gcp_service_account"])
+    
+    # === EL PARCHE MÁGICO AQUÍ ===
+    # Esto fuerza al sistema a interpretar los \n como verdaderos saltos de línea
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    # =============================
+    
+    # Autenticamos
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     sheet = client.open("Registro_UPC").worksheet(sheet_name)
+    
     return sheet
 
 # ==========================================
