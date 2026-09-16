@@ -11,18 +11,18 @@ import os
 # CONFIGURACIÓN DE GOOGLE SHEETS
 # ==========================================
 def get_google_sheet(sheet_name):
+    # Define los alcances
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    try:
-        # Usamos las credenciales guardadas en la nube
-        creds_dict = dict(st.secrets["gcp_service_account"])
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open("Registro_UPC").worksheet(sheet_name)
-        return sheet
-    except Exception as e:
-        # VAMOS A CAMBIAR ESTE MENSAJE PARA VER EL ERROR REAL
-        st.error(f"Error de conexión detallado: {e}")
-        return None
+    
+    # Leemos directamente los secretos de la nube
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    
+    # Autenticamos
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    sheet = client.open("Registro_UPC").worksheet(sheet_name)
+    
+    return sheet
 
 # ==========================================
 # GENERADOR DE PDF CON MARCA DE AGUA
@@ -31,7 +31,6 @@ class FichaPDF(FPDF):
     def header(self):
         # Marca de agua en el centro de la página
         try:
-            # Asegúrate de tener un archivo 'logo_policia.png' en tu carpeta
             with self.local_context(fill_opacity=0.15):
                 self.image('logo_policia.png', x=45, y=80, w=120)
         except:
@@ -49,18 +48,14 @@ def generar_pdf_detenido(datos, foto_path):
     pdf.add_page()
     pdf.set_font('helvetica', '', 11)
     
-    # --- REEMPLAZA ESTA PARTE ---
+    # Agregar datos controlando el ancho y los campos vacíos
     for key, value in datos.items():
-        # Validamos que no esté vacío. Si lo está, ponemos "No registrado"
         texto_valor = str(value).strip() if str(value).strip() else "No registrado"
         
         pdf.set_font('helvetica', 'B', 11)
         pdf.cell(50, 8, f"{key}:", ln=0)
         pdf.set_font('helvetica', '', 11)
-        
-        # En lugar de 0, le damos el ancho exacto restante (140) para evitar que colapse
         pdf.multi_cell(140, 8, texto_valor)
-    # -----------------------------
     
     if foto_path:
         pdf.ln(10)
@@ -78,7 +73,7 @@ st.set_page_config(page_title="Sistema de Registro UPC", layout="wide")
 
 st.title("Sistema de Gestión y Registro - UPC")
 
-# 1 y 4. Datos del Servidor Policial y UPC
+# Datos del Servidor Policial y UPC
 with st.sidebar:
     st.header("Datos de Guardia")
     upc_actual = st.selectbox("Identificación del UPC", ["UPC San Miguel 1", "UPC San Miguel 2", "UPC Centro", "Otro"])
@@ -96,7 +91,7 @@ tab1, tab2 = st.tabs(["Registro de Detenidos", "Registro de Vehículos"])
 with tab1:
     st.header("Ingreso de Detenidos / Aprehendidos")
     
-    # 3. Botón de Verificación
+    # Botón de Verificación (Búsqueda)
     col_busqueda, col_btn = st.columns([3, 1])
     with col_busqueda:
         buscar_cedula = st.text_input("Ingrese cédula para verificar antecedentes en este UPC:")
@@ -104,21 +99,24 @@ with tab1:
         st.write("")
         st.write("")
         if st.button("Verificar Historial"):
-            sheet_detenidos = get_google_sheet("Detenidos")
-            if sheet_detenidos:
+            try:
+                sheet_detenidos = get_google_sheet("Detenidos")
                 registros = sheet_detenidos.get_all_records()
                 df = pd.DataFrame(registros)
                 if not df.empty and 'Cédula' in df.columns:
-                    resultados = df[df['Cédula'] == buscar_cedula]
+                    # Buscamos coincidencias asegurando que sean texto
+                    resultados = df[df['Cédula'].astype(str) == str(buscar_cedula)]
                     if not resultados.empty:
                         st.success(f"Se encontraron {len(resultados)} registro(s) previo(s).")
                         st.dataframe(resultados)
                     else:
                         st.info("No existen registros previos para esta cédula.")
-            else:
-                st.error("Conexión a base de datos no disponible.")
+            except Exception as e:
+                st.error(f"Error al conectar con la base de datos: {e}")
 
     st.subheader("Nuevo Registro")
+    
+    # === FORMULARIO DE DETENIDOS ===
     with st.form("form_detenidos"):
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -140,13 +138,16 @@ with tab1:
         razon_detencion = st.text_area("Motivo / Razón de la Detención")
         foto_upload = st.file_uploader("Subir Fotografía del Detenido", type=['jpg', 'png', 'jpeg'])
         
+        # Solo el botón de envío va dentro del formulario
         submit_detenido = st.form_submit_button("Guardar Registro y Generar Ficha")
         
-        if submit_detenido:
-            if not nombre_servidor or not cedula_servidor:
-                st.error("Debe llenar los datos del servidor policial en la barra lateral.")
-            else:
-                # 7. Guardar en matriz
+    # === LÓGICA FUERA DEL FORMULARIO ===
+    if submit_detenido:
+        if not nombre_servidor or not cedula_servidor:
+            st.error("Debe llenar los datos del servidor policial en la barra lateral.")
+        else:
+            try:
+                # 1. Guardar en matriz
                 datos_guardar = [
                     upc_actual, nombre_servidor, cedula_servidor,
                     ap_paterno, ap_materno, primer_nombre, segundo_nombre, cedula_detenido,
@@ -155,11 +156,10 @@ with tab1:
                 ]
                 
                 sheet_detenidos = get_google_sheet("Detenidos")
-                if sheet_detenidos:
-                    sheet_detenidos.append_row(datos_guardar)
-                    st.success("¡Registro guardado en la nube exitosamente!")
+                sheet_detenidos.append_row(datos_guardar)
+                st.success("¡Registro guardado en la nube exitosamente!")
                 
-                # 8. Generar PDF
+                # 2. Generar PDF
                 foto_path = None
                 if foto_upload:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_foto:
@@ -178,8 +178,12 @@ with tab1:
                 
                 pdf_file = generar_pdf_detenido(datos_dict, foto_path)
                 
+                # 3. Mostrar botón de descarga (Ahora es válido porque está fuera del form)
                 with open(pdf_file, "rb") as f:
                     st.download_button("Descargar Ficha PDF", f, file_name=f"Ficha_{cedula_detenido}.pdf", mime="application/pdf")
+                    
+            except Exception as e:
+                st.error(f"Ocurrió un error: {e}")
 
 # ==========================================
 # PESTAÑA 2: VEHÍCULOS
@@ -190,6 +194,7 @@ with tab2:
     tipo_registro = st.radio("Acción a realizar:", ["Ingreso de Vehículo", "Salida de Vehículo"])
     
     if tipo_registro == "Ingreso de Vehículo":
+        # === FORMULARIO INGRESO VEHÍCULO ===
         with st.form("form_ingreso_vehiculo"):
             col1, col2 = st.columns(2)
             with col1:
@@ -199,17 +204,25 @@ with tab2:
             with col2:
                 fecha_v = st.date_input("Fecha de Ingreso")
                 hora_v = st.time_input("Hora de Ingreso")
-                quien_ingresa = st.text_input("Grado, Nombres y Cédula de quien ingresa (Si es diferente al guardia)")
+                quien_ingresa = st.text_input("Grado, Nombres y C.I. de quien ingresa (Si es distinto al guardia)")
             
             submit_v_in = st.form_submit_button("Registrar Ingreso")
-            if submit_v_in:
-                datos_v = [upc_actual, "INGRESO", placa, chasis, color, str(fecha_v), str(hora_v), quien_ingresa, nombre_servidor]
-                sheet_vehiculos = get_google_sheet("Vehiculos")
-                if sheet_vehiculos:
+            
+        # === LÓGICA FUERA DEL FORMULARIO ===
+        if submit_v_in:
+            if not nombre_servidor:
+                st.error("Ingrese el nombre del servidor en la barra lateral.")
+            else:
+                try:
+                    datos_v = [upc_actual, "INGRESO", placa, chasis, color, str(fecha_v), str(hora_v), quien_ingresa, nombre_servidor]
+                    sheet_vehiculos = get_google_sheet("Vehiculos")
                     sheet_vehiculos.append_row(datos_v)
                     st.success("Ingreso de vehículo registrado en la nube.")
+                except Exception as e:
+                    st.error(f"Ocurrió un error al guardar: {e}")
     
     else:
+        # === FORMULARIO SALIDA VEHÍCULO ===
         with st.form("form_salida_vehiculo"):
             st.info("Generación de Documento de Salida")
             placa_salida = st.text_input("Placas del Vehículo a Retirar")
@@ -219,22 +232,30 @@ with tab2:
             hora_salida = st.time_input("Hora de Salida")
             
             submit_v_out = st.form_submit_button("Registrar Salida y Generar Acta")
-            if submit_v_out:
-                datos_v_out = [upc_actual, "SALIDA", placa_salida, "", "", str(fecha_salida), str(hora_salida), quien_retira, razon_salida, nombre_servidor]
-                sheet_vehiculos = get_google_sheet("Vehiculos")
-                if sheet_vehiculos:
+            
+        # === LÓGICA FUERA DEL FORMULARIO ===
+        if submit_v_out:
+            if not nombre_servidor:
+                st.error("Ingrese el nombre del servidor en la barra lateral.")
+            else:
+                try:
+                    datos_v_out = [upc_actual, "SALIDA", placa_salida, "", "", str(fecha_salida), str(hora_salida), quien_retira, razon_salida, nombre_servidor]
+                    sheet_vehiculos = get_google_sheet("Vehiculos")
                     sheet_vehiculos.append_row(datos_v_out)
                     st.success("Salida registrada en la nube.")
+                        
+                    # Generar PDF de salida
+                    datos_salida = {
+                        "UPC": upc_actual,
+                        "Vehículo Placa": placa_salida,
+                        "Retirado por": quien_retira,
+                        "Razón / Orden": razon_salida,
+                        "Fecha y Hora": f"{fecha_salida} {hora_salida}",
+                        "Entregado por (Guardia)": nombre_servidor
+                    }
+                    pdf_salida = generar_pdf_detenido(datos_salida, None)
                     
-                # Generar PDF de salida rápido
-                datos_salida = {
-                    "UPC": upc_actual,
-                    "Vehículo Placa": placa_salida,
-                    "Retirado por": quien_retira,
-                    "Razón / Orden": razon_salida,
-                    "Fecha y Hora": f"{fecha_salida} {hora_salida}",
-                    "Entregado por (Guardia)": nombre_servidor
-                }
-                pdf_salida = generar_pdf_detenido(datos_salida, None)
-                with open(pdf_salida, "rb") as f:
-                    st.download_button("Descargar Acta de Salida", f, file_name=f"Salida_{placa_salida}.pdf", mime="application/pdf")
+                    with open(pdf_salida, "rb") as f:
+                        st.download_button("Descargar Acta de Salida", f, file_name=f"Salida_{placa_salida}.pdf", mime="application/pdf")
+                except Exception as e:
+                    st.error(f"Ocurrió un error: {e}")
