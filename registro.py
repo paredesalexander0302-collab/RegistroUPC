@@ -172,7 +172,7 @@ def generar_pdf_vehiculo(datos, foto_bytes):
         pdf.set_font('Arial', 'B', 11)
         pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
+        pdf.multi_cell(135, 8, limpiar_texto(str(valor)))
     
     if foto_bytes:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
