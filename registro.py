@@ -51,17 +51,17 @@ def conectar_sheets():
         # 1. Leemos el texto crudo del secreto de Streamlit
         credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
         
-        # 2. Lo convertimos a formato diccionario
-        credenciales_info = json.loads(credenciales_texto)
+        # 2. EL TRUCO ESTÁ AQUÍ: strict=False permite leer los saltos de línea ocultos sin romperse
+        credenciales_info = json.loads(credenciales_texto, strict=False)
         
-        # 3. Nos conectamos usando "from_service_account_info" en lugar de "file"
+        # 3. Nos conectamos usando la información del secreto
         credenciales = Credentials.from_service_account_info(
             credenciales_info,
             scopes=scopes
         )
         cliente = gspread.authorize(credenciales)
         
-        # RECUERDA: Pon el ID real de tu Google Sheet aquí
+        # ID real de tu Google Sheet
         SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
         
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
