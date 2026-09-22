@@ -198,7 +198,7 @@ def generar_pdf_detenido(datos, foto_bytes):
         pdf.set_font('Arial', 'B', 11)
         pdf.cell(55, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(0, 8, limpiar_texto(valor))
+        pdf.multi_cell(135, 8, limpiar_texto(valor))
     
     if foto_bytes:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -222,9 +222,9 @@ def generar_pdf_salida_vehiculo(datos):
     
     for clave, valor in datos.items():
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        pdf.cell(55, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(0, 8, limpiar_texto(valor))
+        pdf.multi_cell(135, 8, limpiar_texto(valor))
         
     return pdf.output(dest='S').encode('latin-1')
 
