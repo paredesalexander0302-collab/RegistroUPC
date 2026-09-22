@@ -185,9 +185,10 @@ def generar_pdf_vehiculo(datos, foto_bytes):
     # Imprimir los datos en formato lista
     for clave, valor in datos.items():
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(50, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(0, 8, limpiar_texto(valor))
+        # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
+        pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
     
     # Procesar e incrustar la foto
     if foto_bytes:
@@ -215,10 +216,10 @@ def generar_pdf_detenido(datos, foto_bytes):
     
     for clave, valor in datos.items():
         pdf.set_font('Arial', 'B', 11)
-        # Ajustamos el ancho de la columna a 55 para que quepa "Servidor que Registra:"
-        pdf.cell(55, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(0, 8, limpiar_texto(valor))
+        # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
+        pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
     
     if foto_bytes:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -244,7 +245,8 @@ def generar_pdf_salida_vehiculo(datos):
         pdf.set_font('Arial', 'B', 11)
         pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(0, 8, limpiar_texto(valor))
+        # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
+        pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
         
     return pdf.output(dest='S').encode('latin-1')
 # Inicializar variables de sesión
