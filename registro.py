@@ -182,12 +182,19 @@ def generar_pdf_vehiculo(datos, foto_bytes):
     pdf.cell(0, 10, limpiar_texto('PARTE DE INGRESO VEHICULAR'), 0, 1, 'C')
     pdf.ln(5)
     
-    # Imprimir los datos en formato lista
+   # Imprimir los datos en formato lista
     for clave, valor in datos.items():
+        # 1. Guardamos la altura actual de la fila
+        y_actual = pdf.get_y()
+        
+        # 2. Forzamos el título (Clave) a empezar en el margen izquierdo (X=10)
         pdf.set_font('Arial', 'B', 11)
+        pdf.set_xy(10, y_actual)
         pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        
+        # 3. Forzamos el contenido (Valor) a empezar 60mm a la derecha (X=70)
         pdf.set_font('Arial', '', 11)
-        # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
+        pdf.set_xy(70, y_actual)
         pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
     
     # Procesar e incrustar la foto
@@ -216,10 +223,17 @@ def generar_pdf_detenido(datos, foto_bytes):
     pdf.ln(5)
     
     for clave, valor in datos.items():
+        # 1. Guardamos la altura actual de la fila
+        y_actual = pdf.get_y()
+        
+        # 2. Forzamos el título (Clave) a empezar en el margen izquierdo (X=10)
         pdf.set_font('Arial', 'B', 11)
+        pdf.set_xy(10, y_actual)
         pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        
+        # 3. Forzamos el contenido (Valor) a empezar 60mm a la derecha (X=70)
         pdf.set_font('Arial', '', 11)
-        # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
+        pdf.set_xy(70, y_actual)
         pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
     
     if foto_bytes:
@@ -244,10 +258,17 @@ def generar_pdf_salida_vehiculo(datos):
     pdf.ln(5)
     
     for clave, valor in datos.items():
+        # 1. Guardamos la altura actual de la fila
+        y_actual = pdf.get_y()
+        
+        # 2. Forzamos el título (Clave) a empezar en el margen izquierdo (X=10)
         pdf.set_font('Arial', 'B', 11)
+        pdf.set_xy(10, y_actual)
         pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        
+        # 3. Forzamos el contenido (Valor) a empezar 60mm a la derecha (X=70)
         pdf.set_font('Arial', '', 11)
-        # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
+        pdf.set_xy(70, y_actual)
         pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
         
     resultado = pdf.output(dest='S')
