@@ -383,7 +383,7 @@ else:
                             
                             servidor = reg.get('Nombre Servidor', 'Desconocido')
                             st.write(f"**Registrado por:** {servidor}")
-                            else:
+                        else:
                     st.success("✅ Sin registros previos.")
                     limpiar_formulario_detenido()
                     st.session_state['cedula_busqueda'] = cedula_buscar 
