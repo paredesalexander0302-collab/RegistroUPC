@@ -211,7 +211,7 @@ def generar_pdf_detenido(datos, foto_bytes):
         pdf.image(tmp_path, x=60, w=90)
         os.unlink(tmp_path)
         
-    return pdf.output(dest='S').encode('latin-1')
+    return bytes(pdf.output())
 
 def generar_pdf_salida_vehiculo(datos):
     pdf = PDF()
@@ -226,7 +226,7 @@ def generar_pdf_salida_vehiculo(datos):
         pdf.set_font('Arial', '', 11)
         pdf.multi_cell(135, 8, limpiar_texto(valor))
         
-    return pdf.output(dest='S').encode('latin-1')
+    return bytes(pdf.output())
 
 # Inicializar variables de sesión
 if 'turno_activo' not in st.session_state: st.session_state['turno_activo'] = False
