@@ -9,6 +9,9 @@ import os
 from google.oauth2.service_account import Credentials
 import json
 
+# --- CONFIGURACIÓN DE CARPETAS DE GOOGLE DRIVE ---
+ID_CARPETA_DETENIDOS = "1pHWgZ-_ArJa-WLbBRoM_PWxFS34K0pDL"
+ID_CARPETA_VEHICULOS = "1kTa2_mM5Ds6E5rhps8AH7IQaXNR6PPiC"
 
 try:
     # Usamos scopes ampliados para permitir subir archivos a Drive
@@ -51,18 +54,18 @@ def conectar_sheets():
         # 1. Leemos el texto crudo del secreto de Streamlit
         credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
         
-        # 2. EL TRUCO ESTÁ AQUÍ: strict=False permite leer los saltos de línea ocultos sin romperse
-        credenciales_info = json.loads(credenciales_texto, strict=False)
+        # 2. Lo convertimos a formato diccionario
+        credenciales_info = json.loads(credenciales_texto)
         
-        # 3. Nos conectamos usando la información del secreto
+        # 3. Nos conectamos usando "from_service_account_info" en lugar de "file"
         credenciales = Credentials.from_service_account_info(
             credenciales_info,
             scopes=scopes
         )
         cliente = gspread.authorize(credenciales)
         
-        # ID real de tu Google Sheet
-        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
+        # RECUERDA: Pon el ID real de tu Google Sheet aquí
+        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
         
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
@@ -75,24 +78,24 @@ def validar_cedula(cedula):
     return bool(re.fullmatch(r'\d{10}', cedula))
 
 # --- FUNCIONES DE BASE DE DATOS (GOOGLE SHEETS) ---
-def buscar_historial_persona(cedula_buscar, db_doc):
+def buscar_historial_persona(cedula, doc):
+    if not doc: return []
     try:
-        hoja_detenidos = db_doc.worksheet("Detenidos")
-        registros = hoja_detenidos.get_all_values()
-        
-        historial = []
-        # Saltamos el encabezado
-        for fila in registros[1:]:
-            # AQUÍ ESTÁ EL TRUCO: Le decimos que borre cualquier apóstrofo (') antes de comparar
-            cedula_hoja = str(fila[7]).replace("'", "").strip() 
-            cedula_buscar_limpia = str(cedula_buscar).strip()
+        ws = doc.worksheet("Detenidos")
+        datos = ws.get_all_records()
+        df = pd.DataFrame(datos)
+        if not df.empty:
+            # LIMPIEZA: Elimina cualquier espacio oculto al inicio o final de los nombres de las columnas
+            df.columns = df.columns.str.strip()
             
-            if cedula_hoja == cedula_buscar_limpia:
-                # (Tu código que arma el diccionario de resultados sigue igual)
-                historial.append({
-                    # ... tus datos ...
-                })
-        return historial
+            # Buscar la columna exacta de la cédula
+            col_cedula = 'Cédula' if 'Cédula' in df.columns else 'Cedula'
+            
+            if col_cedula in df.columns:
+                df[col_cedula] = df[col_cedula].astype(str).str.replace("'", "").str.strip()
+                historial = df[df[col_cedula] == str(cedula).strip()]
+                return historial.to_dict('records')
+        return []
     except Exception as e:
         return []
 
@@ -182,19 +185,12 @@ def generar_pdf_vehiculo(datos, foto_bytes):
     pdf.cell(0, 10, limpiar_texto('PARTE DE INGRESO VEHICULAR'), 0, 1, 'C')
     pdf.ln(5)
     
-   # Imprimir los datos en formato lista
+    # Imprimir los datos en formato lista
     for clave, valor in datos.items():
-        # 1. Guardamos la altura actual de la fila
-        y_actual = pdf.get_y()
-        
-        # 2. Forzamos el título (Clave) a empezar en el margen izquierdo (X=10)
         pdf.set_font('Arial', 'B', 11)
-        pdf.set_xy(10, y_actual)
         pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
-        
-        # 3. Forzamos el contenido (Valor) a empezar 60mm a la derecha (X=70)
         pdf.set_font('Arial', '', 11)
-        pdf.set_xy(70, y_actual)
+        # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
         pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
     
     # Procesar e incrustar la foto
@@ -212,8 +208,7 @@ def generar_pdf_vehiculo(datos, foto_bytes):
         # Eliminar el archivo temporal por seguridad
         os.unlink(tmp_path)
         
-    resultado = pdf.output(dest='S')
-    return resultado.encode('latin-1') if isinstance(resultado, str) else bytes(resultado)
+    return pdf.output(dest='S').encode('latin-1')
 def generar_pdf_detenido(datos, foto_bytes):
     pdf = PDF()
     pdf.add_page()
@@ -223,18 +218,11 @@ def generar_pdf_detenido(datos, foto_bytes):
     pdf.ln(5)
     
     for clave, valor in datos.items():
-        # 1. Guardamos la altura actual de la fila
-        y_actual = pdf.get_y()
-        
-        # 2. Forzamos el título (Clave) a empezar en el margen izquierdo (X=10)
         pdf.set_font('Arial', 'B', 11)
-        pdf.set_xy(10, y_actual)
-        pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
-        
-        # 3. Forzamos el contenido (Valor) a empezar 60mm a la derecha (X=70)
+        # Ajustamos el ancho de la columna a 55 para que quepa "Servidor que Registra:"
+        pdf.cell(55, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.set_xy(70, y_actual)
-        pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
+        pdf.multi_cell(0, 8, limpiar_texto(valor))
     
     if foto_bytes:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -247,8 +235,7 @@ def generar_pdf_detenido(datos, foto_bytes):
         pdf.image(tmp_path, x=60, w=90)
         os.unlink(tmp_path)
         
-    resultado = pdf.output(dest='S')
-    return resultado.encode('latin-1') if isinstance(resultado, str) else bytes(resultado)
+    return pdf.output(dest='S').encode('latin-1')
 def generar_pdf_salida_vehiculo(datos):
     pdf = PDF()
     pdf.add_page()
@@ -258,21 +245,12 @@ def generar_pdf_salida_vehiculo(datos):
     pdf.ln(5)
     
     for clave, valor in datos.items():
-        # 1. Guardamos la altura actual de la fila
-        y_actual = pdf.get_y()
-        
-        # 2. Forzamos el título (Clave) a empezar en el margen izquierdo (X=10)
         pdf.set_font('Arial', 'B', 11)
-        pdf.set_xy(10, y_actual)
         pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
-        
-        # 3. Forzamos el contenido (Valor) a empezar 60mm a la derecha (X=70)
         pdf.set_font('Arial', '', 11)
-        pdf.set_xy(70, y_actual)
-        pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
+        pdf.multi_cell(0, 8, limpiar_texto(valor))
         
-    resultado = pdf.output(dest='S')
-    return resultado.encode('latin-1') if isinstance(resultado, str) else bytes(resultado)
+    return pdf.output(dest='S').encode('latin-1')
 # Inicializar variables de sesión
 if 'turno_activo' not in st.session_state:
     st.session_state['turno_activo'] = False
@@ -363,31 +341,33 @@ else:
                 st.session_state['cedula_busqueda'] = cedula_buscar
                 historial = buscar_historial_persona(cedula_buscar, db_doc)
                 
-                if historial:
-                    st.error(f"🚨 Se encontraron {len(historial)} registro(s).")
-                    ultimo = historial[-1]
-                    st.session_state['det_ap_p'] = str(ultimo.get('Apellido Paterno', ''))
-                    st.session_state['det_ap_m'] = str(ultimo.get('Apellido Materno', ''))
-                    st.session_state['det_nom1'] = str(ultimo.get('Primer Nombre', ''))
-                    st.session_state['det_nom2'] = str(ultimo.get('Segundo Nombre', ''))
-                    st.session_state['det_prof'] = str(ultimo.get('Profesión', ''))
-    
-                    for idx, reg in enumerate(historial):
-                        fecha_reg = reg.get('Fecha Ingreso', 'S/F')
-                        upc_reg = reg.get('UPC', 'S/U')
-                        
-                        with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}"):
-                            motivo_texto = reg.get('Razón Detención', 'No especificado')
-                            st.write(f"**Motivo:** {motivo_texto}")
-                            
-                            servidor = reg.get('Nombre Servidor', 'Desconocido')
-                            st.write(f"**Registrado por:** {servidor}")
-                else:
-                    st.success("✅ Sin registros previos.")
-                    limpiar_formulario_detenido()
-                    st.session_state['cedula_busqueda'] = cedula_buscar
-        with st.form("form_detenido", clear_on_submit=False):
-            st.markdown("**Registro de Nuevo Detenido**")
+        if historial:
+            st.error(f"🚨 Se encontraron {len(historial)} registro(s).")
+            ultimo = historial[-1]
+            st.session_state['det_ap_p'] = str(ultimo.get('Apellido Paterno', ''))
+            st.session_state['det_ap_m'] = str(ultimo.get('Apellido Materno', ''))
+            st.session_state['det_nom1'] = str(ultimo.get('Primer Nombre', ''))
+            st.session_state['det_nom2'] = str(ultimo.get('Segundo Nombre', ''))
+            st.session_state['det_prof'] = str(ultimo.get('Profesión', ''))
+
+            for idx, reg in enumerate(historial):
+                # --- TRUCO PARA VER LOS NOMBRES REALES ---
+                st.write(f"🔍 Datos crudos encontrados por Python:", reg)
+                # ------------------------------------------
+
+                fecha_reg = reg.get('Fecha Ingreso', 'S/F')
+                upc_reg = reg.get('UPC', 'S/U')
+                
+                with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}"):
+                    motivo_texto = reg.get('Razón Detención', 'No especificado')
+                    st.write(f"**Motivo:** {motivo_texto}")
+                    
+                    servidor = reg.get('Nombre Servidor', 'Desconocido')
+                    st.write(f"**Registrado por:** {servidor}")
+        else:
+            st.success("✅ Sin registros previos.")
+            limpiar_formulario_detenido()
+            st.session_state['cedula_busqueda'] = cedula_buscar
             
             c1, c2, c3, c4 = st.columns(4)
             with c1: ap_p = st.text_input("Ap. Paterno*", value=st.session_state.get('det_ap_p', ''))
@@ -416,9 +396,10 @@ else:
                         st.session_state['upc_actual'],              
                         st.session_state['servidor_nombre'],         
                         st.session_state['servidor_cedula'],         
-                        ap_p.upper(), ap_m.upper(), nom1.upper(), nom2.upper(), 
-                        f"'{ced}", # <-- El apóstrofo protege el cero a la izquierda
-                        str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),                                       
+                        ap_p.upper(), ap_m.upper(), nom1.upper(), nom2.upper(), ced,                                         
+                        str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),    
+                        str(fecha_nacimiento), prof.upper(), nacionalidad.upper(),                        
+                        estado_civil, etnia, razon                                        
                     ]
                     
                     if guardar_registro_persona(fila_datos, db_doc):
