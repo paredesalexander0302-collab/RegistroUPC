@@ -62,7 +62,7 @@ def conectar_sheets():
         cliente = gspread.authorize(credenciales)
         
         # ID real de tu Google Sheet
-        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
+        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
         
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
