@@ -430,30 +430,24 @@ if validar_cedula(cedula_buscar):
                     # ==========================================
     # --- PESTAÑA VEHÍCULOS ---
     # ==========================================
-    with tab_vehiculos:
-        if 'foto_veh_key' not in st.session_state: st.session_state['foto_veh_key'] = 0
-        
+with tab_vehiculos:
+    if 'foto_veh_key' not in st.session_state: st.session_state['foto_veh_key'] = 0
         # Variables para PDF de Ingreso
-        if 'pdf_vehiculo' not in st.session_state: st.session_state['pdf_vehiculo'] = None
+    if 'pdf_vehiculo' not in st.session_state: st.session_state['pdf_vehiculo'] = None
         if 'pdf_vehiculo_name' not in st.session_state: st.session_state['pdf_vehiculo_name'] = ""
-        
-        # Variables para PDF de Salida
-        if 'pdf_vehiculo_salida' not in st.session_state: st.session_state['pdf_vehiculo_salida'] = None
-        if 'pdf_vehiculo_salida_name' not in st.session_state: st.session_state['pdf_vehiculo_salida_name'] = ""
-
-        def limpiar_formulario_vehiculo():
-            st.session_state['placa_busqueda'] = ""
-            st.session_state['foto_veh_key'] += 1
-
-        # --- BOTÓN DE DESCARGA PARA INGRESO ---
-        if st.session_state['pdf_vehiculo']:
-            st.success("✅ Ingreso de vehículo guardado correctamente.")
-            st.download_button(
-                label="📄 Descargar Parte de Ingreso (PDF)",
-                data=st.session_state['pdf_vehiculo'],
-                file_name=st.session_state['pdf_vehiculo_name'],
-                mime="application/pdf",
-                type="primary"
+            if 'pdf_vehiculo_salida' not in st.session_state: st.session_state['pdf_vehiculo_salida'] = None
+                if 'pdf_vehiculo_salida_name' not in st.session_state: st.session_state['pdf_vehiculo_salida_name'] = ""
+                    def limpiar_formulario_vehiculo():
+                        st.session_state['placa_busqueda'] = ""
+                        st.session_state['foto_veh_key'] += 1
+                        if st.session_state['pdf_vehiculo']:
+                            st.success("✅ Ingreso de vehículo guardado correctamente.")
+                            st.download_button(
+                                label="📄 Descargar Parte de Ingreso (PDF)",
+                                data=st.session_state['pdf_vehiculo'],
+                                file_name=st.session_state['pdf_vehiculo_name'],
+                                mime="application/pdf",
+                                type="primary"
             )
             if st.button("Finalizar y limpiar panel (Ingreso)"):
                 st.session_state['pdf_vehiculo'] = None
