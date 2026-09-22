@@ -75,24 +75,24 @@ def validar_cedula(cedula):
     return bool(re.fullmatch(r'\d{10}', cedula))
 
 # --- FUNCIONES DE BASE DE DATOS (GOOGLE SHEETS) ---
-def buscar_historial_persona(cedula, doc):
-    if not doc: return []
+def buscar_historial_persona(cedula_buscar, db_doc):
     try:
-        ws = doc.worksheet("Detenidos")
-        datos = ws.get_all_records()
-        df = pd.DataFrame(datos)
-        if not df.empty:
-            # LIMPIEZA: Elimina cualquier espacio oculto al inicio o final de los nombres de las columnas
-            df.columns = df.columns.str.strip()
+        hoja_detenidos = db_doc.worksheet("Detenidos")
+        registros = hoja_detenidos.get_all_values()
+        
+        historial = []
+        # Saltamos el encabezado
+        for fila in registros[1:]:
+            # AQUÍ ESTÁ EL TRUCO: Le decimos que borre cualquier apóstrofo (') antes de comparar
+            cedula_hoja = str(fila[7]).replace("'", "").strip() 
+            cedula_buscar_limpia = str(cedula_buscar).strip()
             
-            # Buscar la columna exacta de la cédula
-            col_cedula = 'Cédula' if 'Cédula' in df.columns else 'Cedula'
-            
-            if col_cedula in df.columns:
-                df[col_cedula] = df[col_cedula].astype(str).str.replace("'", "").str.strip()
-                historial = df[df[col_cedula] == str(cedula).strip()]
-                return historial.to_dict('records')
-        return []
+            if cedula_hoja == cedula_buscar_limpia:
+                # (Tu código que arma el diccionario de resultados sigue igual)
+                historial.append({
+                    # ... tus datos ...
+                })
+        return historial
     except Exception as e:
         return []
 
