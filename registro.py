@@ -205,7 +205,8 @@ def generar_pdf_vehiculo(datos, foto_bytes):
         # Eliminar el archivo temporal por seguridad
         os.unlink(tmp_path)
         
-    return pdf.output(dest='S').encode('latin-1')
+    resultado = pdf.output(dest='S')
+    return resultado.encode('latin-1') if isinstance(resultado, str) else bytes(resultado)
 def generar_pdf_detenido(datos, foto_bytes):
     pdf = PDF()
     pdf.add_page()
@@ -232,7 +233,8 @@ def generar_pdf_detenido(datos, foto_bytes):
         pdf.image(tmp_path, x=60, w=90)
         os.unlink(tmp_path)
         
-    return pdf.output(dest='S').encode('latin-1')
+    resultado = pdf.output(dest='S')
+    return resultado.encode('latin-1') if isinstance(resultado, str) else bytes(resultado)
 def generar_pdf_salida_vehiculo(datos):
     pdf = PDF()
     pdf.add_page()
@@ -248,7 +250,8 @@ def generar_pdf_salida_vehiculo(datos):
         # Cambiamos el ancho de 0 a 130, y aseguramos que el valor sea texto
         pdf.multi_cell(130, 8, limpiar_texto(str(valor)))
         
-    return pdf.output(dest='S').encode('latin-1')
+    resultado = pdf.output(dest='S')
+    return resultado.encode('latin-1') if isinstance(resultado, str) else bytes(resultado)
 # Inicializar variables de sesión
 if 'turno_activo' not in st.session_state:
     st.session_state['turno_activo'] = False
