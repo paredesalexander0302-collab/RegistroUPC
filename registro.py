@@ -363,7 +363,7 @@ else:
                 st.session_state['cedula_busqueda'] = cedula_buscar
                 historial = buscar_historial_persona(cedula_buscar, db_doc)
                 
-                   if historial:
+                if historial:
                     st.error(f"🚨 Se encontraron {len(historial)} registro(s).")
                     ultimo = historial[-1]
                     st.session_state['det_ap_p'] = str(ultimo.get('Apellido Paterno', ''))
