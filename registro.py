@@ -373,13 +373,17 @@ else:
                     st.session_state['det_prof'] = str(ultimo.get('Profesión', ''))
 
                     for idx, reg in enumerate(historial):
+                        # Las etiquetas deben ser idénticas a la fila 1 del Excel
                         fecha_reg = reg.get('Fecha Ingreso', 'S/F')
                         upc_reg = reg.get('UPC', 'S/U')
+                        
                         with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}"):
                             motivo_texto = reg.get('Razón Detención', 'No especificado')
                             st.write(f"**Motivo:** {motivo_texto}")
-                            st.write(f"**Registrado por:** {reg.get('Nombre Servidor', 'Desconocido')}")
-                else:
+                            
+                            servidor = reg.get('Nombre Servidor', 'Desconocido')
+                            st.write(f"**Registrado por:** {servidor}")
+                            else:
                     st.success("✅ Sin registros previos.")
                     limpiar_formulario_detenido()
                     st.session_state['cedula_busqueda'] = cedula_buscar 
