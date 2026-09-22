@@ -7,7 +7,7 @@ from fpdf import FPDF
 import tempfile
 import os
 from google.oauth2.service_account import Credentials
-
+import json
 import io
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
@@ -54,24 +54,29 @@ def conectar_sheets():
         "https://www.googleapis.com/auth/drive"
     ]
     try:
-        # Lee directamente tu archivo local
-        credenciales = Credentials.from_service_account_file(
-            'credenciales.json',
+        # 1. Leemos el texto crudo del secreto de Streamlit
+        credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
+        
+        # 2. Lo convertimos a formato diccionario
+        credenciales_info = json.loads(credenciales_texto)
+        
+        # 3. Nos conectamos usando "from_service_account_info" en lugar de "file"
+        credenciales = Credentials.from_service_account_info(
+            credenciales_info,
             scopes=scopes
         )
         cliente = gspread.authorize(credenciales)
         
-        # --- AQUÍ USAMOS EL ID DEL SPREADSHEET ---
-        # Reemplaza esta cadena con el ID real de tu Google Sheet
-        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk" 
+        # RECUERDA: Pon el ID real de tu Google Sheet aquí
+        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
         
-        hoja_calculo = cliente.open_by_key(SPREADSHEET_ID) 
+        hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
         
     except Exception as e:
-        st.error(f"⚠️ Error detallado de conexión: {e}")
+        st.error(f"⚠️ Error de conexión a la base de datos: {e}")
         return None
-
+    
 def validar_cedula(cedula):
     return bool(re.fullmatch(r'\d{10}', cedula))
 
