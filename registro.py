@@ -81,15 +81,21 @@ def buscar_historial_persona(cedula, doc):
         datos = ws.get_all_records()
         df = pd.DataFrame(datos)
         if not df.empty:
+            # Limpiamos los nombres de las columnas
             df.columns = df.columns.str.strip()
             col_cedula = 'Cédula' if 'Cédula' in df.columns else 'Cedula'
             
             if col_cedula in df.columns:
-                df[col_cedula] = df[col_cedula].astype(str).str.replace("'", "").str.strip()
-                historial = df[df[col_cedula] == str(cedula).strip()]
+                # MAGIA AQUÍ: .zfill(10) obliga a reponer el cero a la izquierda si Sheets lo borró
+                df[col_cedula] = df[col_cedula].astype(str).str.replace("'", "").str.strip().str.zfill(10)
+                
+                # Buscamos asegurándonos de que nuestro texto también tenga 10 dígitos
+                historial = df[df[col_cedula] == str(cedula).strip().zfill(10)]
                 return historial.to_dict('records')
         return []
     except Exception as e:
+        # Ahora veremos inmediatamente si Google rechaza la lectura
+        st.error(f"⚠️ Error interno al leer la matriz de Google Sheets: {e}")
         return []
 
 def guardar_registro_persona(datos, doc):
