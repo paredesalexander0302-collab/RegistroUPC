@@ -331,7 +331,7 @@ else:
         st.subheader("🔍 Verificación de Historial")
         col_b1, col_b2 = st.columns([3, 1])
         with col_b1: 
-        cedula_buscar = st.text_input("Cédula a verificar", value=st.session_state.get('cedula_busqueda', '')).strip()
+            cedula_buscar = st.text_input("Cédula a verificar", value=st.session_state.get('cedula_busqueda', '')).strip()
         with col_b2: 
             st.write("")
             st.write("")
