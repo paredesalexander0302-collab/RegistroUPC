@@ -414,10 +414,9 @@ else:
                         st.session_state['upc_actual'],              
                         st.session_state['servidor_nombre'],         
                         st.session_state['servidor_cedula'],         
-                        ap_p.upper(), ap_m.upper(), nom1.upper(), nom2.upper(), ced,                                         
-                        str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),    
-                        str(fecha_nacimiento), prof.upper(), nacionalidad.upper(),                        
-                        estado_civil, etnia, razon                                        
+                        ap_p.upper(), ap_m.upper(), nom1.upper(), nom2.upper(), 
+                        f"'{ced}", # <-- El apóstrofo protege el cero a la izquierda
+                        str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),                                       
                     ]
                     
                     if guardar_registro_persona(fila_datos, db_doc):
