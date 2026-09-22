@@ -8,13 +8,7 @@ import tempfile
 import os
 from google.oauth2.service_account import Credentials
 import json
-import io
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 
-# --- CONFIGURACIÓN DE CARPETAS DE GOOGLE DRIVE ---
-ID_CARPETA_DETENIDOS = "1pHWgZ-_ArJa-WLbBRoM_PWxFS34K0pDL"
-ID_CARPETA_VEHICULOS = "1kTa2_mM5Ds6E5rhps8AH7IQaXNR6PPiC"
 
 try:
     # Usamos scopes ampliados para permitir subir archivos a Drive
