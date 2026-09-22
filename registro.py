@@ -363,29 +363,29 @@ else:
                 st.session_state['cedula_busqueda'] = cedula_buscar
                 historial = buscar_historial_persona(cedula_buscar, db_doc)
                 
-                if historial:
-                                st.error(f"🚨 Se encontraron {len(historial)} registro(s).")
-                                ultimo = historial[-1]
-                                st.session_state['det_ap_p'] = str(ultimo.get('Apellido Paterno', ''))
-                                st.session_state['det_ap_m'] = str(ultimo.get('Apellido Materno', ''))
-                                st.session_state['det_nom1'] = str(ultimo.get('Primer Nombre', ''))
-                                st.session_state['det_nom2'] = str(ultimo.get('Segundo Nombre', ''))
-                                st.session_state['det_prof'] = str(ultimo.get('Profesión', ''))
-                
-                                for idx, reg in enumerate(historial):
-                                    fecha_reg = reg.get('Fecha Ingreso', 'S/F')
-                                    upc_reg = reg.get('UPC', 'S/U')
-                                    
-                                    with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}"):
-                                        motivo_texto = reg.get('Razón Detención', 'No especificado')
-                                        st.write(f"**Motivo:** {motivo_texto}")
-                                        
-                                        servidor = reg.get('Nombre Servidor', 'Desconocido')
-                                        st.write(f"**Registrado por:** {servidor}")
-                            else:
-                                st.success("✅ Sin registros previos.")
-                                limpiar_formulario_detenido()
-                                st.session_state['cedula_busqueda'] = cedula_buscar
+               if historial:
+                st.error(f"🚨 Se encontraron {len(historial)} registro(s).")
+                ultimo = historial[-1]
+                st.session_state['det_ap_p'] = str(ultimo.get('Apellido Paterno', ''))
+                st.session_state['det_ap_m'] = str(ultimo.get('Apellido Materno', ''))
+                st.session_state['det_nom1'] = str(ultimo.get('Primer Nombre', ''))
+                st.session_state['det_nom2'] = str(ultimo.get('Segundo Nombre', ''))
+                st.session_state['det_prof'] = str(ultimo.get('Profesión', ''))
+
+                for idx, reg in enumerate(historial):
+                    fecha_reg = reg.get('Fecha Ingreso', 'S/F')
+                    upc_reg = reg.get('UPC', 'S/U')
+                    
+                    with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}"):
+                        motivo_texto = reg.get('Razón Detención', 'No especificado')
+                        st.write(f"**Motivo:** {motivo_texto}")
+                        
+                        servidor = reg.get('Nombre Servidor', 'Desconocido')
+                        st.write(f"**Registrado por:** {servidor}")
+            else:
+                st.success("✅ Sin registros previos.")
+                limpiar_formulario_detenido()
+                st.session_state['cedula_busqueda'] = cedula_buscar
         with st.form("form_detenido", clear_on_submit=False):
             st.markdown("**Registro de Nuevo Detenido**")
             
