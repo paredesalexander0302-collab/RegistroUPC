@@ -318,7 +318,7 @@ else:
                     st.session_state['det_prof'] = str(ultimo.get('Profesión', ''))
                     
                     for idx, reg in enumerate(historial):
-                        st.write(f"🔍 Datos crudos encontrados por Python:", reg)
+                        # st.write(f"🔍 Datos crudos encontrados por Python:", reg)
                         fecha_reg = reg.get('Fecha Ingreso', 'S/F')
                         upc_reg = reg.get('UPC', 'S/U')
                         with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}"):
