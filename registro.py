@@ -169,10 +169,11 @@ def generar_pdf_vehiculo(datos, foto_bytes):
     pdf.ln(5)
     
     for clave, valor in datos.items():
+        pdf.set_x(10)
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(60, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        pdf.cell(65, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(135, 8, limpiar_texto(str(valor)))
+        pdf.multi_cell(120, 8, limpiar_texto(str(valor)))
     
     if foto_bytes:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -195,10 +196,11 @@ def generar_pdf_detenido(datos, foto_bytes):
     pdf.ln(5)
     
     for clave, valor in datos.items():
+        pdf.set_x(10)
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(55, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        pdf.cell(65, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(135, 8, limpiar_texto(valor))
+        pdf.multi_cell(120, 8, limpiar_texto(valor))
     
     if foto_bytes:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
@@ -221,10 +223,11 @@ def generar_pdf_salida_vehiculo(datos):
     pdf.ln(5)
     
     for clave, valor in datos.items():
+        pdf.set_x(10)
         pdf.set_font('Arial', 'B', 11)
-        pdf.cell(55, 8, limpiar_texto(f"{clave}:"), 0, 0)
+        pdf.cell(65, 8, limpiar_texto(f"{clave}:"), 0, 0)
         pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(135, 8, limpiar_texto(valor))
+        pdf.multi_cell(120, 8, limpiar_texto(valor))
         
     return bytes(pdf.output())
 
