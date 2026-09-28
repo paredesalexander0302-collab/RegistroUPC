@@ -23,14 +23,28 @@ creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SC
 drive_service = build('drive', 'v3', credentials=creds_drive)
 
 def subir_imagen_a_drive(foto_file, nombre_archivo, folder_id):
-    """Sube la imagen a Drive y retorna su ID único."""
+    """Sube la imagen a Drive a través de Google Apps Script saltando el límite de cuota."""
+    # PEGA AQUÍ LA URL QUE COPIASTE EN EL PASO 1
+    url_script = "https://script.google.com/macros/s/AKfycbykAr-EOO6l25y6JIPMNYlXcvr3dzOSnbOFX-C3VwSV3tGwrnpK0WcpHhTdOvuQzy-CEg/exec" 
+    
     try:
-        file_metadata = {'name': nombre_archivo, 'parents': [folder_id]}
-        media = MediaIoBaseUpload(io.BytesIO(foto_file.getvalue()), mimetype=foto_file.type, resumable=True)
-        archivo = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        return archivo.get('id')
+        # Convertimos la imagen a texto plano para enviarla por internet sin que Google la bloquee
+        base64_img = base64.b64encode(foto_file.getvalue()).decode('utf-8')
+        datos = {
+            "folder": folder_id,
+            "fileName": nombre_archivo,
+            "mimeType": foto_file.type,
+            "fileData": base64_img
+        }
+        respuesta = requests.post(url_script, data=datos)
+        
+        if "ERROR" in respuesta.text:
+            st.error(f"🚨 Error en el puente de Google Script: {respuesta.text}")
+            return None
+            
+        return respuesta.text.strip() # Retorna el ID de la foto limpia
     except Exception as e:
-        st.error(f"🚨 Error real de Google Drive al subir: {e}")
+        st.error(f"⚠️ Error de conexión al enviar la foto: {e}")
         return None
 
 def obtener_imagen_drive(file_id):
