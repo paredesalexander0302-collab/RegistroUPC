@@ -22,11 +22,16 @@ try:
     creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SCOPES_DRIVE)
     drive_service = build('drive', 'v3', credentials=creds_drive)
 except Exception as e:
+    # --- ALARMA ENCENDIDA ---
+    st.error(f"🚨 ERROR CRÍTICO DE INICIO DE DRIVE: {e}")
     drive_service = None
 
 def subir_imagen_a_drive(foto_file, nombre_archivo, folder_id):
     """Sube la imagen a Drive y retorna su ID único."""
-    if not drive_service: return None
+    if not drive_service: 
+        # --- SEGUNDA ALARMA ---
+        st.error("🚨 La imagen no se guardó porque el motor de Drive está apagado.")
+        return None
     try:
         file_metadata = {'name': nombre_archivo, 'parents': [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(foto_file.getvalue()), mimetype=foto_file.type, resumable=True)
