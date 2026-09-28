@@ -292,7 +292,7 @@ if st.form_submit_button("Guardar Registro Detenido"):
     # ==========================================
     # --- PESTAÑA VEHÍCULOS ---
     # ==========================================
-        with tab_vehiculos:
+    with tab_vehiculos:
         if 'foto_veh_key' not in st.session_state: st.session_state['foto_veh_key'] = 0
         
         def limpiar_formulario_vehiculo():
