@@ -4,42 +4,36 @@ from datetime import datetime
 import pandas as pd
 import gspread
 import io
-from google.oauth2.service_account import Credentials
 import json
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
 # --- CONFIGURACIÓN DE CARPETAS DE GOOGLE DRIVE ---
 ID_CARPETA_DETENIDOS = "1pHWgZ-_ArJa-WLbBRoM_PWxFS34K0pDL"
 ID_CARPETA_VEHICULOS = "1kTa2_mM5Ds6E5rhps8AH7IQaXNR6PPiC"
 
-# ¡QUITAMOS EL SILENCIADOR PARA FORZAR EL ERROR VISUAL!
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
-
+# ¡SIN SILENCIADOR! Si falta algo, arrojará el error rojo en pantalla
 SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive']
 credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
 credenciales_info = json.loads(credenciales_texto)
 creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SCOPES_DRIVE)
 drive_service = build('drive', 'v3', credentials=creds_drive)
 
-
 def subir_imagen_a_drive(foto_file, nombre_archivo, folder_id):
     """Sube la imagen a Drive y retorna su ID único."""
-    if not drive_service: 
-        # --- SEGUNDA ALARMA ---
-        st.error("🚨 La imagen no se guardó porque el motor de Drive está apagado.")
-        return None
     try:
         file_metadata = {'name': nombre_archivo, 'parents': [folder_id]}
         media = MediaIoBaseUpload(io.BytesIO(foto_file.getvalue()), mimetype=foto_file.type, resumable=True)
         archivo = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         return archivo.get('id')
     except Exception as e:
-        st.error(f"⚠️ Error al subir la imagen a Drive: {e}")
+        st.error(f"🚨 Error real de Google Drive al subir: {e}")
         return None
 
 def obtener_imagen_drive(file_id):
     """Descarga la imagen desde Drive para mostrarla en pantalla."""
-    if not drive_service or not file_id: return None
+    if not file_id: return None
     try:
         request = drive_service.files().get_media(fileId=file_id)
         file = io.BytesIO()
@@ -48,7 +42,8 @@ def obtener_imagen_drive(file_id):
         while done is False:
             status, done = downloader.next_chunk()
         return file.getvalue()
-    except:
+    except Exception as e:
+        st.error(f"⚠️ No se pudo cargar la foto (ID: {file_id}): {e}")
         return None
 
 # Configuración básica de la página
@@ -67,11 +62,11 @@ def conectar_sheets():
         credenciales = Credentials.from_service_account_info(credenciales_info, scopes=scopes)
         cliente = gspread.authorize(credenciales)
         
-        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
+        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
     except Exception as e:
-        st.error(f"⚠️ Error de conexión a la base de datos: {e}")
+        st.error(f"⚠️ Error de conexión a Google Sheets: {e}")
         return None
     
 def validar_cedula(cedula):
@@ -88,7 +83,6 @@ def buscar_historial_persona(cedula, doc):
             df.columns = df.columns.str.strip()
             col_cedula = 'Cédula' if 'Cédula' in df.columns else 'Cedula'
             if col_cedula in df.columns:
-                # El .zfill(10) protege contra el borrado de ceros a la izquierda
                 df[col_cedula] = df[col_cedula].astype(str).str.replace("'", "").str.strip().str.zfill(10)
                 historial = df[df[col_cedula] == str(cedula).strip().zfill(10)]
                 return historial.to_dict('records')
@@ -103,7 +97,8 @@ def guardar_registro_persona(datos, doc):
         ws = doc.worksheet("Detenidos")
         ws.append_row(datos)
         return True
-    except:
+    except Exception as e:
+        st.error(f"Error al guardar en Sheets: {e}")
         return False
 
 def buscar_vehiculo(placa, doc):
@@ -127,7 +122,8 @@ def guardar_ingreso_vehiculo(datos, doc):
         ws = doc.worksheet("Vehiculos")
         ws.append_row(datos)
         return True
-    except:
+    except Exception as e:
+        st.error(f"Error al guardar en Sheets: {e}")
         return False
 
 def actualizar_salida_vehiculo(placa, datos_salida, doc):
@@ -261,16 +257,16 @@ else:
             caracteristicas = st.text_area("Características Físicas (Tatuajes, cicatrices, vestimenta, etc.)*", value=st.session_state.get('det_carac', ''))
             razon = st.text_area("Razón de Detención*")
             foto = st.file_uploader("Foto del Detenido*", type=["jpg", "png", "jpeg"], key=f"foto_det_{st.session_state['foto_key']}")
-if st.form_submit_button("Guardar Registro Detenido"):
+            
+            if st.form_submit_button("Guardar Registro Detenido"):
                 if ap_p and ap_m and nom1 and ced and razon and caracteristicas and foto and validar_cedula(ced):
                     
                     with st.spinner("Subiendo fotografía a la matriz..."):
                         nombre_foto = f"DET_{ced}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg"
                         foto_id_drive = subir_imagen_a_drive(foto, nombre_foto, ID_CARPETA_DETENIDOS)
                         
-                    # --- FRENO DE MANO ---
                     if not foto_id_drive:
-                        st.stop() # Esto congela la app para que puedas leer el error de Drive
+                        st.stop() # Freno de mano: la app se congela y deja visible el error rojo
                         
                     fila_datos = [
                         st.session_state['upc_actual'], st.session_state['servidor_nombre'], st.session_state['servidor_cedula'],         
@@ -285,7 +281,7 @@ if st.form_submit_button("Guardar Registro Detenido"):
                         limpiar_formulario_detenido()
                         st.rerun() 
                     else:
-                        st.error("❌ Error al guardar en la nube.")
+                        st.error("❌ Error al guardar los datos en Google Sheets.")
                 else:
                     st.error("⚠️ Llene todos los campos obligatorios y asegúrese de adjuntar la fotografía.")
 
@@ -318,7 +314,6 @@ if st.form_submit_button("Guardar Registro Detenido"):
             if vehiculo_in:
                 st.warning(f"🚨 El vehículo **{placa}** está INGRESADO.")
                 
-                # Mostrar foto del vehículo ingresado
                 foto_id_v = vehiculo_in.get('Foto ID', '')
                 if foto_id_v:
                     with st.spinner("Cargando foto del vehículo..."):
@@ -367,7 +362,7 @@ if st.form_submit_button("Guardar Registro Detenido"):
                     with col_of1: sp_ingresa = st.text_input("Grado, Nombres y Apellidos del SP*")
                     with col_of2: cedula_sp_ingresa = st.text_input("Número de Cédula del SP*", max_chars=10)
                     
-if st.form_submit_button("Guardar Ingreso de Vehículo"):
+                    if st.form_submit_button("Guardar Ingreso de Vehículo"):
                         if chasis and color and motivo and sp_ingresa and cedula_sp_ingresa and foto_veh_ingreso:
                             if validar_cedula(cedula_sp_ingresa):
                                 
@@ -375,9 +370,8 @@ if st.form_submit_button("Guardar Ingreso de Vehículo"):
                                     nombre_foto = f"VEH_{placa}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg"
                                     foto_id_drive = subir_imagen_a_drive(foto_veh_ingreso, nombre_foto, ID_CARPETA_VEHICULOS)
                                 
-                                # --- FRENO DE MANO ---
                                 if not foto_id_drive:
-                                    st.stop() # Congela la app
+                                    st.stop() # Freno de mano
                                 
                                 fila_v = [
                                     st.session_state['upc_actual'], f"{st.session_state['servidor_nombre']} ({st.session_state['servidor_cedula']})", 
