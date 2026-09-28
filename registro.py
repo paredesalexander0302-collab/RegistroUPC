@@ -50,20 +50,20 @@ def obtener_imagen_drive(file_id):
 st.set_page_config(page_title="Sistema de Registro UPC", layout="wide")
 
 # --- CONEXIÓN A GOOGLE SHEETS ---
+# --- CONEXIÓN A GOOGLE SHEETS ---
 @st.cache_resource
 def conectar_sheets():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
     try:
         credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
         credenciales_info = json.loads(credenciales_texto)
-        credenciales = Credentials.from_service_account_info(credenciales_info, scopes=scopes)
-        cliente = gspread.authorize(credenciales)
         
-        SPREADSHEET_ID = "1kTa2_mM5Ds6E5rhps8AH7IQaXNR6PPiC"
+        # Usamos el método nativo y directo de gspread (automáticamente maneja los permisos)
+        cliente = gspread.service_account_from_dict(credenciales_info)
+        
+        # Agregamos .strip() para destruir cualquier espacio invisible que cause el error 400
+        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk".strip()
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
+        
         return hoja_calculo
     except Exception as e:
         st.error(f"⚠️ Error de conexión a Google Sheets: {e}")
