@@ -367,7 +367,7 @@ if st.form_submit_button("Guardar Registro Detenido"):
                     with col_of1: sp_ingresa = st.text_input("Grado, Nombres y Apellidos del SP*")
                     with col_of2: cedula_sp_ingresa = st.text_input("Número de Cédula del SP*", max_chars=10)
                     
-                    if st.form_submit_button("Guardar Ingreso de Vehículo"):
+if st.form_submit_button("Guardar Ingreso de Vehículo"):
                         if chasis and color and motivo and sp_ingresa and cedula_sp_ingresa and foto_veh_ingreso:
                             if validar_cedula(cedula_sp_ingresa):
                                 
@@ -375,11 +375,15 @@ if st.form_submit_button("Guardar Registro Detenido"):
                                     nombre_foto = f"VEH_{placa}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg"
                                     foto_id_drive = subir_imagen_a_drive(foto_veh_ingreso, nombre_foto, ID_CARPETA_VEHICULOS)
                                 
+                                # --- FRENO DE MANO ---
+                                if not foto_id_drive:
+                                    st.stop() # Congela la app
+                                
                                 fila_v = [
                                     st.session_state['upc_actual'], f"{st.session_state['servidor_nombre']} ({st.session_state['servidor_cedula']})", 
                                     str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),                                
                                     placa, chasis.upper(), color.upper(), motivo,                                                                  
-                                    sp_ingresa.upper(), cedula_sp_ingresa, "Ingresado", foto_id_drive or ""                                                              
+                                    sp_ingresa.upper(), cedula_sp_ingresa, "Ingresado", foto_id_drive                                                              
                                 ]
                                 if guardar_ingreso_vehiculo(fila_v, db_doc):
                                     st.success("✅ Ingreso de vehículo guardado correctamente.")
