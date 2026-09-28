@@ -3,9 +3,7 @@ import re
 from datetime import datetime
 import pandas as pd
 import gspread
-from fpdf import FPDF
-import tempfile
-import os
+import io
 from google.oauth2.service_account import Credentials
 import json
 
@@ -13,32 +11,43 @@ import json
 ID_CARPETA_DETENIDOS = "1pHWgZ-_ArJa-WLbBRoM_PWxFS34K0pDL"
 ID_CARPETA_VEHICULOS = "1kTa2_mM5Ds6E5rhps8AH7IQaXNR6PPiC"
 
+# Conexión directa a Google Drive usando los Secrets de Streamlit
 try:
     from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseUpload
-    import io
-    # Usamos scopes ampliados para permitir subir archivos a Drive
+    from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
     SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive']
-    creds_drive = Credentials.from_service_account_file('credenciales.json', scopes=SCOPES_DRIVE)
+    
+    credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
+    credenciales_info = json.loads(credenciales_texto)
+    creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SCOPES_DRIVE)
     drive_service = build('drive', 'v3', credentials=creds_drive)
 except Exception as e:
     drive_service = None
 
-def subir_pdf_a_drive(pdf_bytes, nombre_archivo, folder_id):
-    """Sube un archivo PDF directamente a una carpeta específica de Google Drive."""
-    if not drive_service:
-        st.error("🚨 Error crítico: El servicio de Google Drive no se inicializó correctamente.")
-        return None
+def subir_imagen_a_drive(foto_file, nombre_archivo, folder_id):
+    """Sube la imagen a Drive y retorna su ID único."""
+    if not drive_service: return None
     try:
-        file_metadata = {
-            'name': nombre_archivo,
-            'parents': [folder_id]
-        }
-        media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype='application/pdf', resumable=True)
+        file_metadata = {'name': nombre_archivo, 'parents': [folder_id]}
+        media = MediaIoBaseUpload(io.BytesIO(foto_file.getvalue()), mimetype=foto_file.type, resumable=True)
         archivo = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         return archivo.get('id')
     except Exception as e:
-        st.error(f"⚠️ Google Drive rechazó el archivo. Motivo exacto: {e}")
+        st.error(f"⚠️ Error al subir la imagen a Drive: {e}")
+        return None
+
+def obtener_imagen_drive(file_id):
+    """Descarga la imagen desde Drive para mostrarla en pantalla."""
+    if not drive_service or not file_id: return None
+    try:
+        request = drive_service.files().get_media(fileId=file_id)
+        file = io.BytesIO()
+        downloader = MediaIoBaseDownload(file, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+        return file.getvalue()
+    except:
         return None
 
 # Configuración básica de la página
@@ -54,18 +63,12 @@ def conectar_sheets():
     try:
         credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
         credenciales_info = json.loads(credenciales_texto)
-        credenciales = Credentials.from_service_account_info(
-            credenciales_info,
-            scopes=scopes
-        )
+        credenciales = Credentials.from_service_account_info(credenciales_info, scopes=scopes)
         cliente = gspread.authorize(credenciales)
         
-        # RECUERDA: Pon el ID real de tu Google Sheet aquí
-        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
-        
+        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
-        
     except Exception as e:
         st.error(f"⚠️ Error de conexión a la base de datos: {e}")
         return None
@@ -73,7 +76,7 @@ def conectar_sheets():
 def validar_cedula(cedula):
     return bool(re.fullmatch(r'\d{10}', cedula))
 
-# --- FUNCIONES DE BASE DE DATOS (GOOGLE SHEETS) ---
+# --- FUNCIONES DE BASE DE DATOS ---
 def buscar_historial_persona(cedula, doc):
     if not doc: return []
     try:
@@ -81,21 +84,16 @@ def buscar_historial_persona(cedula, doc):
         datos = ws.get_all_records()
         df = pd.DataFrame(datos)
         if not df.empty:
-            # Limpiamos los nombres de las columnas
             df.columns = df.columns.str.strip()
             col_cedula = 'Cédula' if 'Cédula' in df.columns else 'Cedula'
-            
             if col_cedula in df.columns:
-                # MAGIA AQUÍ: .zfill(10) obliga a reponer el cero a la izquierda si Sheets lo borró
+                # El .zfill(10) protege contra el borrado de ceros a la izquierda
                 df[col_cedula] = df[col_cedula].astype(str).str.replace("'", "").str.strip().str.zfill(10)
-                
-                # Buscamos asegurándonos de que nuestro texto también tenga 10 dígitos
                 historial = df[df[col_cedula] == str(cedula).strip().zfill(10)]
                 return historial.to_dict('records')
         return []
     except Exception as e:
-        # Ahora veremos inmediatamente si Google rechaza la lectura
-        st.error(f"⚠️ Error interno al leer la matriz de Google Sheets: {e}")
+        st.error(f"Error interno leyendo matriz: {e}")
         return []
 
 def guardar_registro_persona(datos, doc):
@@ -146,96 +144,7 @@ def actualizar_salida_vehiculo(placa, datos_salida, doc):
         st.error(f"Error en actualización: {e}")
         return False
 
-# Intentamos conectar a la base de datos al iniciar
 db_doc = conectar_sheets()
-
-# --- GENERADOR DE PDF ---
-def limpiar_texto(texto):
-    return str(texto).encode('latin-1', 'replace').decode('latin-1')
-
-class PDF(FPDF):
-    def header(self):
-        if os.path.exists("logo_policia.png"):
-            self.image("logo_policia.png", 10, 8, 25)
-        self.set_font('Arial', 'B', 14)
-        self.cell(0, 10, limpiar_texto('POLICÍA NACIONAL DEL ECUADOR'), 0, 1, 'C')
-        self.set_font('Arial', 'I', 10)
-        self.cell(0, 10, limpiar_texto('SISTEMA DE REGISTRO UPC - DISTRITO SAN MIGUEL'), 0, 1, 'C')
-        self.ln(10)
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
-
-def generar_pdf_vehiculo(datos, foto_bytes):
-    pdf = PDF()
-    pdf.add_page()
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, limpiar_texto('PARTE DE INGRESO VEHICULAR'), 0, 1, 'C')
-    pdf.ln(5)
-    
-    for clave, valor in datos.items():
-        pdf.set_x(10)
-        pdf.set_font('Arial', 'B', 11)
-        pdf.cell(65, 8, limpiar_texto(f"{clave}:"), 0, 0)
-        pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(120, 8, limpiar_texto(str(valor)))
-    
-    if foto_bytes:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-            tmp.write(foto_bytes.getvalue())
-            tmp_path = tmp.name
-        
-        pdf.ln(10)
-        pdf.set_font('Arial', 'B', 11)
-        pdf.cell(0, 10, limpiar_texto('REGISTRO FOTOGRÁFICO:'), 0, 1, 'L')
-        pdf.image(tmp_path, x=60, w=90)
-        os.unlink(tmp_path)
-        
-    return pdf.output(dest='S').encode('latin-1')
-
-def generar_pdf_detenido(datos, foto_bytes):
-    pdf = PDF()
-    pdf.add_page()
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, limpiar_texto('PARTE DE INGRESO DE DETENIDO'), 0, 1, 'C')
-    pdf.ln(5)
-    
-    for clave, valor in datos.items():
-        pdf.set_x(10)
-        pdf.set_font('Arial', 'B', 11)
-        pdf.cell(65, 8, limpiar_texto(f"{clave}:"), 0, 0)
-        pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(120, 8, limpiar_texto(valor))
-    
-    if foto_bytes:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
-            tmp.write(foto_bytes.getvalue())
-            tmp_path = tmp.name
-        
-        pdf.ln(10)
-        pdf.set_font('Arial', 'B', 11)
-        pdf.cell(0, 10, limpiar_texto('REGISTRO FOTOGRÁFICO:'), 0, 1, 'L')
-        pdf.image(tmp_path, x=60, w=90)
-        os.unlink(tmp_path)
-        
-    return bytes(pdf.output())
-
-def generar_pdf_salida_vehiculo(datos):
-    pdf = PDF()
-    pdf.add_page()
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, limpiar_texto('PARTE DE SALIDA / RETIRO VEHICULAR'), 0, 1, 'C')
-    pdf.ln(5)
-    
-    for clave, valor in datos.items():
-        pdf.set_x(10)
-        pdf.set_font('Arial', 'B', 11)
-        pdf.cell(65, 8, limpiar_texto(f"{clave}:"), 0, 0)
-        pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(120, 8, limpiar_texto(valor))
-        
-    return bytes(pdf.output())
 
 # Inicializar variables de sesión
 if 'turno_activo' not in st.session_state: st.session_state['turno_activo'] = False
@@ -251,10 +160,7 @@ st.title("Sistema de Gestión y Registro - UPC")
 if not st.session_state['turno_activo']:
     st.header("1. Identificación del Servidor Policial en Guardia")
     with st.form("form_servidor"):
-        lista_upcs = [
-            "UPC San Miguel", "UPC Chimbo", "UPC San Pablo", 
-            "UPC Balsapamba", "UPC Telimbela", "UPC Santiago", "UPC Magdalena"
-        ]
+        lista_upcs = ["UPC San Miguel", "UPC Chimbo", "UPC San Pablo", "UPC Balsapamba", "UPC Telimbela", "UPC Santiago", "UPC Magdalena"]
         upc_seleccionado = st.selectbox("Unidad de Policía Comunitaria (UPC)", lista_upcs)
         nombre_servidor = st.text_input("Grado, Nombres y Apellidos*")
         cedula_servidor = st.text_input("Número de Cédula*", max_chars=10)
@@ -282,27 +188,11 @@ else:
     # ==========================================
     with tab_detenidos:
         if 'foto_key' not in st.session_state: st.session_state['foto_key'] = 0
-        if 'pdf_detenido' not in st.session_state: st.session_state['pdf_detenido'] = None
-        if 'pdf_detenido_name' not in st.session_state: st.session_state['pdf_detenido_name'] = ""
 
         def limpiar_formulario_detenido():
-            for key in ['det_ap_p', 'det_ap_m', 'det_nom1', 'det_nom2', 'cedula_busqueda', 'det_prof']:
+            for key in ['det_ap_p', 'det_ap_m', 'det_nom1', 'det_nom2', 'cedula_busqueda', 'det_prof', 'det_carac']:
                 st.session_state[key] = ""
             st.session_state['foto_key'] += 1
-
-        if st.session_state['pdf_detenido']:
-            st.success("✅ Registro guardado en la matriz exitosamente.")
-            st.download_button(
-                label="📄 Descargar Parte de Detenido (PDF)",
-                data=st.session_state['pdf_detenido'],
-                file_name=st.session_state['pdf_detenido_name'],
-                mime="application/pdf",
-                type="primary"
-            )
-            if st.button("Finalizar y limpiar panel (Detenidos)"):
-                st.session_state['pdf_detenido'] = None
-                st.rerun()
-            st.divider()
 
         st.subheader("🔍 Verificación de Historial")
         col_b1, col_b2 = st.columns([3, 1])
@@ -327,14 +217,23 @@ else:
                     st.session_state['det_prof'] = str(ultimo.get('Profesión', ''))
                     
                     for idx, reg in enumerate(historial):
-                        # st.write(f"🔍 Datos crudos encontrados por Python:", reg)
                         fecha_reg = reg.get('Fecha Ingreso', 'S/F')
                         upc_reg = reg.get('UPC', 'S/U')
-                        with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}"):
-                            motivo_texto = reg.get('Razón Detención', 'No especificado')
-                            st.write(f"**Motivo:** {motivo_texto}")
-                            servidor = reg.get('Nombre Servidor', 'Desconocido')
-                            st.write(f"**Registrado por:** {servidor}")
+                        with st.expander(f"Ficha #{idx+1} - {fecha_reg} | {upc_reg}", expanded=(idx == len(historial)-1)):
+                            col_info, col_foto = st.columns([2, 1])
+                            with col_info:
+                                st.write(f"**Motivo:** {reg.get('Razón Detención', 'No especificado')}")
+                                st.write(f"**Características Físicas:** {reg.get('Características Físicas', 'No registradas')}")
+                                st.write(f"**Registrado por:** {reg.get('Nombre Servidor', 'Desconocido')}")
+                            with col_foto:
+                                foto_id = reg.get('Foto ID', '')
+                                if foto_id:
+                                    with st.spinner("Cargando foto..."):
+                                        img_bytes = obtener_imagen_drive(foto_id)
+                                        if img_bytes:
+                                            st.image(img_bytes, use_column_width=True)
+                                        else:
+                                            st.info("Imagen no disponible")
                 else:
                     st.success("✅ Sin registros previos.")
                     limpiar_formulario_detenido()
@@ -358,84 +257,43 @@ else:
             with c9: etnia = st.selectbox("Etnia", ["Mestizo", "Indígena", "Afroecuatoriano", "Montubio", "Blanco", "Otro"])
             with c10: prof = st.text_input("Profesión*", value=st.session_state.get('det_prof', ''))
             
+            caracteristicas = st.text_area("Características Físicas (Tatuajes, cicatrices, vestimenta, etc.)*", value=st.session_state.get('det_carac', ''))
             razon = st.text_area("Razón de Detención*")
-            foto = st.file_uploader("Foto del Detenido*", type=["jpg", "png"], key=f"foto_det_{st.session_state['foto_key']}")
+            foto = st.file_uploader("Foto del Detenido*", type=["jpg", "png", "jpeg"], key=f"foto_det_{st.session_state['foto_key']}")
             
             if st.form_submit_button("Guardar Registro Detenido"):
-                if ap_p and ap_m and nom1 and ced and razon and foto and validar_cedula(ced):
+                if ap_p and ap_m and nom1 and ced and razon and caracteristicas and foto and validar_cedula(ced):
+                    
+                    with st.spinner("Subiendo fotografía a la matriz..."):
+                        nombre_foto = f"DET_{ced}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg"
+                        foto_id_drive = subir_imagen_a_drive(foto, nombre_foto, ID_CARPETA_DETENIDOS)
+                        
                     fila_datos = [
-                        st.session_state['upc_actual'],              
-                        st.session_state['servidor_nombre'],         
-                        st.session_state['servidor_cedula'],         
+                        st.session_state['upc_actual'], st.session_state['servidor_nombre'], st.session_state['servidor_cedula'],         
                         ap_p.upper(), ap_m.upper(), nom1.upper(), nom2.upper(), ced,                                         
                         str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),    
                         str(fecha_nacimiento), prof.upper(), nacionalidad.upper(),                        
-                        estado_civil, etnia, razon                                        
+                        estado_civil, etnia, razon, caracteristicas, foto_id_drive or ""                                        
                     ]
                     
                     if guardar_registro_persona(fila_datos, db_doc):
-                        datos_pdf = {
-                            "UPC": st.session_state['upc_actual'],
-                            "Fecha de Ingreso": str(datetime.today().date()),
-                            "Hora de Ingreso": str(datetime.now().strftime("%H:%M:%S")),
-                            "Nombres Completos": f"{ap_p.upper()} {ap_m.upper()} {nom1.upper()} {nom2.upper()}",
-                            "C.I. Detenido": ced,
-                            "Nacionalidad": nacionalidad.upper(),
-                            "Profesión / Ocupación": prof.upper(),
-                            "Servidor que Registra": f"{st.session_state['servidor_nombre']} (C.I: {st.session_state['servidor_cedula']})",
-                            "Motivo de Detención": razon
-                        }
-                        st.session_state['pdf_detenido'] = generar_pdf_detenido(datos_pdf, foto)
-                        st.session_state['pdf_detenido_name'] = f"Ingreso_Detenido_{ced}.pdf"
-                        
+                        st.success("✅ Registro guardado en la matriz exitosamente.")
                         limpiar_formulario_detenido()
                         st.rerun() 
                     else:
                         st.error("❌ Error al guardar en la nube.")
                 else:
-                    st.error("⚠️ Llene campos obligatorios y asegúrese de adjuntar la fotografía.")
+                    st.error("⚠️ Llene todos los campos obligatorios y asegúrese de adjuntar la fotografía.")
 
     # ==========================================
     # --- PESTAÑA VEHÍCULOS ---
     # ==========================================
     with tab_vehiculos:
         if 'foto_veh_key' not in st.session_state: st.session_state['foto_veh_key'] = 0
-        if 'pdf_vehiculo' not in st.session_state: st.session_state['pdf_vehiculo'] = None
-        if 'pdf_vehiculo_name' not in st.session_state: st.session_state['pdf_vehiculo_name'] = ""
-        if 'pdf_vehiculo_salida' not in st.session_state: st.session_state['pdf_vehiculo_salida'] = None
-        if 'pdf_vehiculo_salida_name' not in st.session_state: st.session_state['pdf_vehiculo_salida_name'] = ""
         
         def limpiar_formulario_vehiculo():
             st.session_state['placa_busqueda'] = ""
             st.session_state['foto_veh_key'] += 1
-
-        if st.session_state['pdf_vehiculo']:
-            st.success("✅ Ingreso de vehículo guardado correctamente.")
-            st.download_button(
-                label="📄 Descargar Parte de Ingreso (PDF)",
-                data=st.session_state['pdf_vehiculo'],
-                file_name=st.session_state['pdf_vehiculo_name'],
-                mime="application/pdf",
-                type="primary"
-            )
-            if st.button("Finalizar y limpiar panel (Ingreso)"):
-                st.session_state['pdf_vehiculo'] = None
-                st.rerun()
-            st.divider()
-
-        if st.session_state['pdf_vehiculo_salida']:
-            st.success("✅ Salida de vehículo registrada correctamente.")
-            st.download_button(
-                label="📄 Descargar Parte de Salida (PDF)",
-                data=st.session_state['pdf_vehiculo_salida'],
-                file_name=st.session_state['pdf_vehiculo_salida_name'],
-                mime="application/pdf",
-                type="primary"
-            )
-            if st.button("Finalizar y limpiar panel (Salida)"):
-                st.session_state['pdf_vehiculo_salida'] = None
-                st.rerun()
-            st.divider()
 
         st.subheader("🔍 Estado del Vehículo")
         
@@ -452,8 +310,18 @@ else:
         if st.session_state.get('placa_busqueda', ''):
             placa = st.session_state['placa_busqueda']
             vehiculo_in = buscar_vehiculo(placa, db_doc)
+            
             if vehiculo_in:
                 st.warning(f"🚨 El vehículo **{placa}** está INGRESADO.")
+                
+                # Mostrar foto del vehículo ingresado
+                foto_id_v = vehiculo_in.get('Foto ID', '')
+                if foto_id_v:
+                    with st.spinner("Cargando foto del vehículo..."):
+                        img_bytes = obtener_imagen_drive(foto_id_v)
+                        if img_bytes:
+                            st.image(img_bytes, caption=f"Fotografía de Ingreso - {placa}", width=400)
+                
                 with st.form("form_salida_v", clear_on_submit=False):
                     st.markdown("**1. Datos del Servidor Policial que retira/traslada el vehículo**")
                     col_sp_ret1, col_sp_ret2 = st.columns(2)
@@ -469,25 +337,10 @@ else:
                             fecha_salida = str(datetime.today().date())
                             hora_salida = str(datetime.now().strftime("%H:%M:%S"))
                             
-                            datos_salida = [
-                                sp_retira.upper(), cedula_sp_retira, r_retira, 
-                                fecha_salida, hora_salida
-                            ]
+                            datos_salida = [sp_retira.upper(), cedula_sp_retira, r_retira, fecha_salida, hora_salida]
                             
                             if actualizar_salida_vehiculo(placa, datos_salida, db_doc):
-                                datos_pdf_salida = {
-                                    "UPC": st.session_state['upc_actual'],
-                                    "Placa / Identificación": placa,
-                                    "Fecha de Salida": fecha_salida,
-                                    "Hora de Salida": hora_salida,
-                                    "Servidor que Retira/Traslada": f"{sp_retira.upper()} (C.I: {cedula_sp_retira})",
-                                    "Razón de Retiro": r_retira,
-                                    "Entregado por (Servidor de Turno)": f"{st.session_state['servidor_nombre']} (C.I: {st.session_state['servidor_cedula']})"
-                                }
-                                
-                                st.session_state['pdf_vehiculo_salida'] = generar_pdf_salida_vehiculo(datos_pdf_salida)
-                                st.session_state['pdf_vehiculo_salida_name'] = f"Salida_Vehiculo_{placa}.pdf"
-                                
+                                st.success("✅ Salida registrada exitosamente.")
                                 limpiar_formulario_vehiculo() 
                                 st.rerun() 
                             else:
@@ -503,7 +356,7 @@ else:
                     with col_i2: color = st.text_input("Color*")
                     
                     motivo = st.text_area("Motivo de ingreso del vehículo*")
-                    foto_veh_ingreso = st.file_uploader("Foto del Vehículo*", type=["jpg", "png"], key=f"foto_veh_{st.session_state['foto_veh_key']}") 
+                    foto_veh_ingreso = st.file_uploader("Foto del Vehículo*", type=["jpg", "png", "jpeg"], key=f"foto_veh_{st.session_state['foto_veh_key']}") 
                     
                     st.markdown("**2. Datos del Servidor Policial que ingresa el vehículo**")
                     col_of1, col_of2 = st.columns(2)
@@ -513,27 +366,19 @@ else:
                     if st.form_submit_button("Guardar Ingreso de Vehículo"):
                         if chasis and color and motivo and sp_ingresa and cedula_sp_ingresa and foto_veh_ingreso:
                             if validar_cedula(cedula_sp_ingresa):
+                                
+                                with st.spinner("Subiendo fotografía a la matriz..."):
+                                    nombre_foto = f"VEH_{placa}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg"
+                                    foto_id_drive = subir_imagen_a_drive(foto_veh_ingreso, nombre_foto, ID_CARPETA_VEHICULOS)
+                                
                                 fila_v = [
-                                    st.session_state['upc_actual'],                                          
-                                    f"{st.session_state['servidor_nombre']} ({st.session_state['servidor_cedula']})", 
+                                    st.session_state['upc_actual'], f"{st.session_state['servidor_nombre']} ({st.session_state['servidor_cedula']})", 
                                     str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),                                
                                     placa, chasis.upper(), color.upper(), motivo,                                                                  
-                                    sp_ingresa.upper(), cedula_sp_ingresa, "Ingresado"                                                              
+                                    sp_ingresa.upper(), cedula_sp_ingresa, "Ingresado", foto_id_drive or ""                                                              
                                 ]
                                 if guardar_ingreso_vehiculo(fila_v, db_doc):
-                                    datos_pdf = {
-                                        "UPC": st.session_state['upc_actual'],
-                                        "Fecha Ingreso": str(datetime.today().date()),
-                                        "Hora Ingreso": str(datetime.now().strftime("%H:%M:%S")),
-                                        "Placa / Identificación": placa,
-                                        "Chasis / Motor": chasis.upper(),
-                                        "Color": color.upper(),
-                                        "Servidor que Ingresa": f"{sp_ingresa.upper()} (C.I: {cedula_sp_ingresa})",
-                                        "Motivo de Ingreso": motivo
-                                    }
-                                    st.session_state['pdf_vehiculo'] = generar_pdf_vehiculo(datos_pdf, foto_veh_ingreso)
-                                    st.session_state['pdf_vehiculo_name'] = f"Ingreso_Vehiculo_{placa}.pdf"
-                                    
+                                    st.success("✅ Ingreso de vehículo guardado correctamente.")
                                     limpiar_formulario_vehiculo() 
                                     st.rerun() 
                                 else:
