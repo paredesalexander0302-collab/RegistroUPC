@@ -20,10 +20,7 @@ credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
 credenciales_info = json.loads(credenciales_texto)
 creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SCOPES_DRIVE)
 drive_service = build('drive', 'v3', credentials=creds_drive)
-except Exception as e:
-    # --- ALARMA ENCENDIDA ---
-    st.error(f"🚨 ERROR CRÍTICO DE INICIO DE DRIVE: {e}")
-    drive_service = None
+
 
 def subir_imagen_a_drive(foto_file, nombre_archivo, folder_id):
     """Sube la imagen a Drive y retorna su ID único."""
