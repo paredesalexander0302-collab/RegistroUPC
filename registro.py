@@ -76,7 +76,7 @@ def conectar_sheets():
         credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
         credenciales_info = json.loads(credenciales_texto)
         cliente = gspread.service_account_from_dict(credenciales_info)
-        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk".strip()
+        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk".strip()
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
     except Exception as e:
