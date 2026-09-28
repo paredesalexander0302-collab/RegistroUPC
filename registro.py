@@ -61,7 +61,7 @@ def conectar_sheets():
         cliente = gspread.service_account_from_dict(credenciales_info)
         
         # Agregamos .strip() para destruir cualquier espacio invisible que cause el error 400
-        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk".strip()
+        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk".strip()
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         
         return hoja_calculo
