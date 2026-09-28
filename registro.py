@@ -261,20 +261,23 @@ else:
             caracteristicas = st.text_area("Características Físicas (Tatuajes, cicatrices, vestimenta, etc.)*", value=st.session_state.get('det_carac', ''))
             razon = st.text_area("Razón de Detención*")
             foto = st.file_uploader("Foto del Detenido*", type=["jpg", "png", "jpeg"], key=f"foto_det_{st.session_state['foto_key']}")
-            
-            if st.form_submit_button("Guardar Registro Detenido"):
+if st.form_submit_button("Guardar Registro Detenido"):
                 if ap_p and ap_m and nom1 and ced and razon and caracteristicas and foto and validar_cedula(ced):
                     
                     with st.spinner("Subiendo fotografía a la matriz..."):
                         nombre_foto = f"DET_{ced}_{datetime.now().strftime('%Y%m%d%H%M')}.jpg"
                         foto_id_drive = subir_imagen_a_drive(foto, nombre_foto, ID_CARPETA_DETENIDOS)
                         
+                    # --- FRENO DE MANO ---
+                    if not foto_id_drive:
+                        st.stop() # Esto congela la app para que puedas leer el error de Drive
+                        
                     fila_datos = [
                         st.session_state['upc_actual'], st.session_state['servidor_nombre'], st.session_state['servidor_cedula'],         
                         ap_p.upper(), ap_m.upper(), nom1.upper(), nom2.upper(), ced,                                         
                         str(datetime.today().date()), str(datetime.now().strftime("%H:%M:%S")),    
                         str(fecha_nacimiento), prof.upper(), nacionalidad.upper(),                        
-                        estado_civil, etnia, razon, caracteristicas, foto_id_drive or ""                                        
+                        estado_civil, etnia, razon, caracteristicas, foto_id_drive                                        
                     ]
                     
                     if guardar_registro_persona(fila_datos, db_doc):
