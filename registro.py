@@ -7,6 +7,7 @@ import io
 import json
 import requests
 import base64
+from PIL import Image
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -15,7 +16,7 @@ from googleapiclient.http import MediaIoBaseDownload
 ID_CARPETA_DETENIDOS = "1pHWgZ-_ArJa-WLbBRoM_PWxFS34K0pDL"
 ID_CARPETA_VEHICULOS = "1kTa2_mM5Ds6E5rhps8AH7IQaXNR6PPiC"
 
-# Inicializamos el lector de Drive (para mostrar las fotos en pantalla)
+# Inicializamos el lector de Drive (para descargar las fotos)
 SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive']
 credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
 credenciales_info = json.loads(credenciales_texto)
@@ -23,7 +24,7 @@ creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SC
 drive_service = build('drive', 'v3', credentials=creds_drive)
 
 def subir_imagen_a_drive(foto_file, nombre_archivo, folder_id):
-    """Sube la imagen a Drive usando el puente de Apps Script para evitar límites de cuota."""
+    """Sube la imagen a Drive usando el puente de Apps Script."""
     
     # ⚠️ PEGA AQUÍ TU URL DE GOOGLE SCRIPT EXACTAMENTE COMO TE LA DIO GOOGLE ⚠️
     url_script = "https://script.google.com/macros/s/AKfycbykAr-EOO6l25y6JIPMNYlXcvr3dzOSnbOFX-C3VwSV3tGwrnpK0WcpHhTdOvuQzy-CEg/exec" 
@@ -39,16 +40,15 @@ def subir_imagen_a_drive(foto_file, nombre_archivo, folder_id):
         respuesta = requests.post(url_script, data=datos)
         texto_respuesta = respuesta.text.strip()
         
-        # ESCUDO DE SEGURIDAD: Evita que guarde código HTML basura en tu Excel
         if "<!DOCTYPE" in texto_respuesta or "<html" in texto_respuesta:
-            st.error("🚨 El Google Script está bloqueado. Debes configurarlo en 'Quién tiene acceso: Cualquier persona'.")
+            st.error("🚨 El Google Script está bloqueado. Configúralo en 'Quién tiene acceso: Cualquier persona'.")
             return None
             
         if "ERROR" in texto_respuesta:
             st.error(f"🚨 Error en Google Script: {texto_respuesta}")
             return None
             
-        return texto_respuesta # Retorna solo el código limpio de la foto
+        return texto_respuesta 
     except Exception as e:
         st.error(f"⚠️ Error de conexión al subir la foto: {e}")
         return None
@@ -64,7 +64,7 @@ def obtener_imagen_drive(file_id):
         while done is False:
             status, done = downloader.next_chunk()
         return file.getvalue()
-    except Exception as e:
+    except Exception:
         return None
 
 # Configuración básica de la página
@@ -76,7 +76,7 @@ def conectar_sheets():
         credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
         credenciales_info = json.loads(credenciales_texto)
         cliente = gspread.service_account_from_dict(credenciales_info)
-        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk".strip()
+        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk".strip()
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
     except Exception as e:
@@ -101,8 +101,7 @@ def buscar_historial_persona(cedula, doc):
                 historial = df[df[col_cedula] == str(cedula).strip().zfill(10)]
                 return historial.to_dict('records')
         return []
-    except Exception as e:
-        st.error(f"Error interno leyendo matriz: {e}")
+    except Exception:
         return []
 
 def guardar_registro_persona(datos, doc):
@@ -111,8 +110,7 @@ def guardar_registro_persona(datos, doc):
         ws = doc.worksheet("Detenidos")
         ws.append_row(datos)
         return True
-    except Exception as e:
-        st.error(f"Error al guardar en Sheets: {e}")
+    except Exception:
         return False
 
 def buscar_vehiculo(placa, doc):
@@ -136,8 +134,7 @@ def guardar_ingreso_vehiculo(datos, doc):
         ws = doc.worksheet("Vehiculos")
         ws.append_row(datos)
         return True
-    except Exception as e:
-        st.error(f"Error al guardar en Sheets: {e}")
+    except Exception:
         return False
 
 def actualizar_salida_vehiculo(placa, datos_salida, doc):
@@ -151,8 +148,7 @@ def actualizar_salida_vehiculo(placa, datos_salida, doc):
             ws.update(values=[["Retirado"] + datos_salida], range_name=rango)
             return True
         return False
-    except Exception as e:
-        st.error(f"Error en actualización: {e}")
+    except Exception:
         return False
 
 db_doc = conectar_sheets()
@@ -233,12 +229,20 @@ else:
                             with col_foto:
                                 foto_id = reg.get('Foto ID', '')
                                 if foto_id and len(foto_id) > 10 and "<" not in foto_id:
-                                    with st.spinner("Cargando foto..."):
+                                    # Enlace directo a Google Drive como plan de respaldo
+                                    st.markdown(f"[🔗 **ABRIR FOTO ORIGINAL EN DRIVE**](https://drive.google.com/file/d/{foto_id}/view)")
+                                    
+                                    with st.spinner("Cargando vista previa..."):
                                         img_bytes = obtener_imagen_drive(foto_id)
                                         if img_bytes:
-                                            st.image(img_bytes, use_column_width=True)
+                                            try:
+                                                # PIL purifica la imagen. Si falla, no colapsa la app.
+                                                imagen = Image.open(io.BytesIO(img_bytes))
+                                                st.image(imagen, use_container_width=True)
+                                            except Exception:
+                                                st.warning("⚠️ Vista previa no disponible. Usa el enlace de arriba para verla en Drive.")
                                         else:
-                                            st.info("No se pudo cargar la imagen de Drive.")
+                                            st.info("No se pudo cargar la vista previa.")
                 else:
                     st.success("✅ Sin registros previos.")
                     limpiar_formulario_detenido()
@@ -324,10 +328,15 @@ else:
                 
                 foto_id_v = vehiculo_in.get('Foto ID', '')
                 if foto_id_v and len(foto_id_v) > 10 and "<" not in foto_id_v:
-                    with st.spinner("Cargando foto del vehículo..."):
+                    st.markdown(f"[🔗 **ABRIR FOTO ORIGINAL EN DRIVE**](https://drive.google.com/file/d/{foto_id_v}/view)")
+                    with st.spinner("Cargando vista previa..."):
                         img_bytes = obtener_imagen_drive(foto_id_v)
                         if img_bytes:
-                            st.image(img_bytes, caption=f"Fotografía de Ingreso - {placa}", width=400)
+                            try:
+                                imagen = Image.open(io.BytesIO(img_bytes))
+                                st.image(imagen, caption=f"Fotografía de Ingreso - {placa}", width=400)
+                            except Exception:
+                                st.warning("⚠️ Vista previa no disponible. Usa el enlace de arriba para verla en Drive.")
                 
                 with st.form("form_salida_v", clear_on_submit=False):
                     st.markdown("**1. Datos del Servidor Policial que retira/traslada el vehículo**")
