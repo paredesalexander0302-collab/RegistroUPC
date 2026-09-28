@@ -11,16 +11,15 @@ import json
 ID_CARPETA_DETENIDOS = "1pHWgZ-_ArJa-WLbBRoM_PWxFS34K0pDL"
 ID_CARPETA_VEHICULOS = "1kTa2_mM5Ds6E5rhps8AH7IQaXNR6PPiC"
 
-# Conexión directa a Google Drive usando los Secrets de Streamlit
-try:
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
-    SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive']
-    
-    credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
-    credenciales_info = json.loads(credenciales_texto)
-    creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SCOPES_DRIVE)
-    drive_service = build('drive', 'v3', credentials=creds_drive)
+# ¡QUITAMOS EL SILENCIADOR PARA FORZAR EL ERROR VISUAL!
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+
+SCOPES_DRIVE = ['https://www.googleapis.com/auth/drive']
+credenciales_texto = st.secrets["GOOGLE_CREDENTIALS_JSON"]
+credenciales_info = json.loads(credenciales_texto)
+creds_drive = Credentials.from_service_account_info(credenciales_info, scopes=SCOPES_DRIVE)
+drive_service = build('drive', 'v3', credentials=creds_drive)
 except Exception as e:
     # --- ALARMA ENCENDIDA ---
     st.error(f"🚨 ERROR CRÍTICO DE INICIO DE DRIVE: {e}")
