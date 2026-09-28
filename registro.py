@@ -5,6 +5,8 @@ import pandas as pd
 import gspread
 import io
 import json
+import requests
+import base64
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
