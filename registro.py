@@ -66,7 +66,7 @@ def conectar_sheets():
         credenciales = Credentials.from_service_account_info(credenciales_info, scopes=scopes)
         cliente = gspread.authorize(credenciales)
         
-        SPREADSHEET_ID = "1QvluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
+        SPREADSHEET_ID = "1QVluCNoVihqku69oKiXhbks3IZypaJRVaomSW0hzkOk"
         hoja_calculo = cliente.open_by_key(SPREADSHEET_ID)
         return hoja_calculo
     except Exception as e:
